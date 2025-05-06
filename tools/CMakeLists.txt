@@ -22,36 +22,37 @@ else()
   )
 endif()
 
-set(json_SOURCES
+set(refcount_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../lib/RefcountMain.cpp"
 )
 
-add_executable(json ${json_SOURCES})
+add_executable(refcount ${refcount_SOURCES})
 
 target_include_directories(
-  json
+  refcount
   PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 
-  target_link_libraries(json
-    LLVMCore
-    LLVMSupport
-    LLVMIRReader
-    LLVMBitWriter
-    LLVMOption
-    LLVMFrontendOpenMP
-    clangTooling
-    clangFrontend
-    clangDriver
-    clangSerialization
-    clangAnalysis
-    clangAST
-    clangASTMatchers
-    clangCodeGen
-    clangParse
-    clangSema
-    clangSupport
-    clangLex
-    clangToolingCore
-    clangBasic
-  )
+target_link_libraries(refcount
+  LLVMCore
+  LLVMSupport
+  LLVMIRReader
+  LLVMBitWriter
+  LLVMOption
+  LLVMFrontendOpenMP
+  clangTooling
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangAnalysis
+  clangAST
+  clangASTMatchers
+  clangCodeGen
+  clangParse
+  clangSema
+  clangSupport
+  clangLex
+  clangToolingCore
+  clangBasic
+)

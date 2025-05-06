@@ -38,9 +38,6 @@ static cl::opt<std::string> InputModule{cl::Positional,
                                         cl::Required,
                                         cl::cat{CallCounterCategory}};
 
-//===----------------------------------------------------------------------===//
-// static - implementation
-//===----------------------------------------------------------------------===//
 static void refcountIdentify(Module &M) {
   // Create a module pass manager and add StaticCallCounterPrinter to it.
   ModulePassManager MPM;
@@ -61,9 +58,6 @@ static void refcountIdentify(Module &M) {
   MPM.run(M, MAM);
 }
 
-//===----------------------------------------------------------------------===//
-// Main driver code.
-//===----------------------------------------------------------------------===//
 int main(int Argc, char **Argv) {
   // Hide all options apart from the ones specific to this tool
   cl::HideUnrelatedOptions(CallCounterCategory);
