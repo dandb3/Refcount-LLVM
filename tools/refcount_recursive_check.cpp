@@ -127,17 +127,26 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
 
         const auto &SM = *Result.SourceManager;
         const auto &loc = node->getBeginLoc();
+        const auto &filename = SM.getFilename(SM.getSpellingLoc(loc)).str();
         
-        const RecordDecl *tmp = node->getParent();
+        const RecordDecl *tmp = dyn_cast<RecordDecl>(node->getLexicalDeclContext());
         const RecordDecl *parent;
         
         do {
             parent = tmp;
-            // llvm::outs() << parent->getName() << "\n";
-        } while(tmp = dyn_cast<RecordDecl>(parent->getParent()));
-        
-        llvm::outs() << "Struct: " << parent->getName() << "\n";
-        llvm::outs() << "    " << node->getType().getAsString() << " " << node->getName() << "\n";
+            // llvm::outs() << "cur: " << parent->getName() << "\n";
+            // llvm::outs() << "parent: " << parent->getParent()->getDeclKindName() << "\n";
+        } while(tmp = dyn_cast<RecordDecl>(parent->getLexicalDeclContext()));
+
+
+        // llvm::outs() << "Struct: " << parent->getName() << "\n";
+        // llvm::outs() << "    " << node->getType().getAsString() << " " << node->getName() << "\n";
+
+        if (parent->getName() == "") {
+            llvm::outs() << "pos: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+            parent->print(llvm::outs());
+            llvm::outs() << "\n";
+        }
     }
 };
 
