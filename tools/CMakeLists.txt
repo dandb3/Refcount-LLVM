@@ -1,3 +1,5 @@
+#### static ####
+
 set(static_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/StaticMain.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/StaticCallCounter.cpp"
@@ -22,6 +24,8 @@ else()
   )
 endif()
 
+#### refcount ####
+
 set(refcount_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/RefcountMain.cpp"
@@ -35,6 +39,42 @@ target_include_directories(
   "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 
 target_link_libraries(refcount
+  LLVMCore
+  LLVMSupport
+  LLVMIRReader
+  LLVMBitWriter
+  LLVMOption
+  LLVMFrontendOpenMP
+  clangTooling
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangAnalysis
+  clangAST
+  clangASTMatchers
+  clangCodeGen
+  clangParse
+  clangSema
+  clangSupport
+  clangLex
+  clangToolingCore
+  clangBasic
+)
+
+#### recursive ####
+
+set(recursive_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/refcount_recursive_check.cpp"
+)
+
+add_executable(recursive ${recursive_SOURCES})
+
+target_include_directories(
+  recursive
+  PRIVATE
+)
+
+target_link_libraries(recursive
   LLVMCore
   LLVMSupport
   LLVMIRReader

@@ -4,7 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/jdoh/Documents/llvm-project/clang/include"
+                "/home/jdoh/Documents/llvm-project/clang/include",
+                "/home/jdoh/Documents/llvm-project/llvm/include"
             ],
             "defines": [],
             "cStandard": "c17",

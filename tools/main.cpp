@@ -100,3 +100,10 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
+// #include "llvm/Linker/Linker.h"
+
+// void foo() {
+//     llvm::Linker linker;
+//     linker.linkInModule();
+// }

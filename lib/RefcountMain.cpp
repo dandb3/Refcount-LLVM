@@ -19,34 +19,45 @@ using namespace llvm;
 #define REF_LOG(args)
 #endif
 
+StructType *Refcount::typeAtomic;
+StructType *Refcount::typeAtomic64;
+StructType *Refcount::typeKref;
+StructType *Refcount::typeRefcountStruct;
+bool Refcount::refcountAllExist = false;
+
 PreservedAnalyses Refcount::run(Module &M, ModuleAnalysisManager &MAM) {
+    Refcount::typeAtomic
+        = StructType::getTypeByName(M.getContext(), "struct.atomic_t");
+    Refcount::typeAtomic64
+        = StructType::getTypeByName(M.getContext(), "struct.atomic64_t");
+    Refcount::typeKref
+        = StructType::getTypeByName(M.getContext(), "struct.kref");
+    Refcount::typeRefcountStruct
+        = StructType::getTypeByName(M.getContext(), "struct.refcount_struct");
+    // if (Refcount::typeAtomic == nullptr || Refcount::typeAtomic64 == nullptr
+    //     || Refcount::typeKref == nullptr || Refcount::typeRefcountStruct == nullptr) {
+    //     llvm::errs() << "Not Enough Refcount Structs!\n";
+    //     return PreservedAnalyses::none();
+    // }
+
     for (StructType *ST : M.getIdentifiedStructTypes()) {
         if (ST->isOpaque()) {
             continue;
         }
-        StringRef parentType = ST->getName();
-        if (isRefcountType(parentType)) {
-            REF_LOG(llvm::outs() << "   "; ST->print(llvm::outs()); llvm::outs() << "\n";);
+
+        if (true) {
+        // if (Refcount::containRefcountType(ST)) {
+            ST->print(llvm::outs());
+            llvm::outs() << "\n";
         }
     }
     
     return PreservedAnalyses::none();
 }
 
-bool Refcount::containRefcountType(StringRef &parentType, StringRef &childType) {
-    if (parentType == "struct.kref" || parentType == "struct.refcount_struct") {
-        return false;
-    }
-    if (childType == "struct.atomic_t") {
-        return true;
-    }
-    else if (childType == "struct.atomic64_t") {
-        return true;
-    }
-    else if (childType == "struct.refcount_struct") {
-        return true;
-    }
-    else if (childType == "struct.kref") {
+bool Refcount::isRefcountType(StructType *ST) {
+    if (ST == Refcount::typeAtomic || ST == typeAtomic64
+        || ST == Refcount::typeKref || ST == typeRefcountStruct) {
         return true;
     }
     else {
@@ -54,12 +65,26 @@ bool Refcount::containRefcountType(StringRef &parentType, StringRef &childType) 
     }
 }
 
-bool Refcount::isRefcountType(StringRef &type) {
-    if (type == "struct.atomic_t" || type == "struct.atomic64_t"
-        || type == "struct.refcount_struct" || type == "struct.kref") {
-        return true;
-    }
-    else {
+bool Refcount::containRefcountType(StructType *ST) {
+    StructType *fieldST;
+
+    if (ST == Refcount::typeKref || ST == Refcount::typeRefcountStruct) {
         return false;
     }
+
+    // REF_LOG(llvm::outs() << ST->getName() << "\n");
+
+    unsigned int numElem = ST->getNumElements();
+    for (unsigned int i = 0; i < numElem; ++i) {
+        Type *fieldTy = ST->getElementType(i);
+
+        if ((fieldST = dyn_cast<StructType>(fieldTy)) == nullptr)
+            continue;
+
+        if (Refcount::isRefcountType(fieldST))
+            return true;
+        // REF_LOG(llvm::outs() << "    " << fieldST->getName() << "\n");
+    }
+
+    return false;
 }

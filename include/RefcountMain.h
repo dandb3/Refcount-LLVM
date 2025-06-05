@@ -10,6 +10,12 @@ using namespace llvm;
 
 class Refcount : public PassInfoMixin<Refcount> {
 private:
+    static StructType *typeAtomic;
+    static StructType *typeAtomic64;
+    static StructType *typeKref;
+    static StructType *typeRefcountStruct;
+
+    static bool refcountAllExist;
 
 public:
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
@@ -22,8 +28,8 @@ public:
     //     KREF
     // };
 
-    bool containRefcountType(StringRef &parentType, StringRef &childType);
-    bool isRefcountType(StringRef &type);
+    bool containRefcountType(StructType *ST);
+    bool isRefcountType(StructType *ST);
     static bool isRequired() { return true; }
 };
 

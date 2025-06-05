@@ -23,9 +23,14 @@ struct wow {
     };
 };
 
+struct wow1 {
+    refcount_t val1;
+};
+
 int func() {
     struct wow val1;
     struct kref val2;
     atomic_long_t val3;
+    struct wow1 val4;
     return 0;
 }
