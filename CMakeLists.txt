@@ -45,8 +45,8 @@ project(llvm-tutor)
 # among other paths that will be checked by default when using
 # `find_package(llvm)`. So there's no need to add it here.
 list(APPEND CMAKE_PREFIX_PATH
-  "/home/jdoh/Documents/llvm-project/build/lib/cmake/llvm"
-  "/home/jdoh/Documents/llvm-project/build/lib/cmake/clang"
+  "/home/junwoong/programs/llvm-project/build/lib/cmake/llvm"
+  "/home/junwoong/programs/llvm-project/build/lib/cmake/clang"
 )
 
 # The way LLVMConfigVersion.cmake is set up, it will only match MAJOR.MINOR
@@ -56,9 +56,9 @@ find_package(LLVM CONFIG REQUIRED)
 find_package(Clang CONFIG REQUIRED)
 
 # We defer the version checking to this statement
-if("${LLVM_VERSION_MAJOR}" VERSION_LESS 19)
-  message(FATAL_ERROR "Found LLVM ${LLVM_VERSION_MAJOR}, but need LLVM 19 or above")
-endif()
+# if("${LLVM_VERSION_MAJOR}" VERSION_LESS 19)
+#   message(FATAL_ERROR "Found LLVM ${LLVM_VERSION_MAJOR}, but need LLVM 19 or above")
+# endif()
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LT_LLVM_INSTALL_DIR}")
@@ -128,7 +128,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 # Doing this at the end so that all definitions and link/include paths are
 # available for the sub-projects.
 #===============================================================================
-add_subdirectory(lib)
+# add_subdirectory(lib)
 add_subdirectory(tools)
-add_subdirectory(test)
-add_subdirectory(HelloWorld)
+# add_subdirectory(test)
+# add_subdirectory(HelloWorld)

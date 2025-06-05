@@ -55,7 +55,7 @@ target_link_libraries(refcount
   clangCodeGen
   clangParse
   clangSema
-  clangSupport
+  # clangSupport
   clangLex
   clangToolingCore
   clangBasic
@@ -91,7 +91,7 @@ target_link_libraries(recursive
   clangCodeGen
   clangParse
   clangSema
-  clangSupport
+  # clangSupport
   clangLex
   clangToolingCore
   clangBasic

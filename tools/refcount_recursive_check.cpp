@@ -16,9 +16,9 @@
 #include <iomanip>
 #include <stddef.h>
 
-#define TEST_DIR "new"
-#define LOG_DIR "/home/jdoh/test/" TEST_DIR "/log/"
-#define COMPILE_DATABASE "/home/jdoh/test/" TEST_DIR "/compile_commands.json"
+// #define TEST_DIR "new"
+#define LOG_DIR "/home/junwoong/work/refcount/build/log/"
+#define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
 using namespace clang;
@@ -69,7 +69,7 @@ class WarningDiagConsumer : public DiagnosticConsumer {
 //
 // ...
 
-static std::ofstream total_output;
+// static std::ofstream total_output;
 
 // const RecordDecl *getTopLevelStruct(const FieldDecl *field) {
 //     const DeclContext *tmp = dyn_cast<DeclContext>(field->getParent());
@@ -97,25 +97,30 @@ enum APIArgType {
 
 // key = { path, line}
 // value = { { SET, 1 }, { ADD, 1 }, { SUB, 1 }, ... }
-typedef std::pair<std::string, unsigned int> RefcntKey;
-typedef std::pair<APIType, int> RefcntVal;
-typedef std::map<RefcntKey, std::vector<RefcntVal>> RefcntMap;
-static RefcntMap refcntCandidates;
-static std::set<std::string> funcNames;
 
-std::ofstream recursiveRefcount;
+// typedef std::pair<std::string, unsigned int> RefcntKey;
+// typedef std::pair<APIType, int> RefcntVal;
+// typedef std::map<RefcntKey, std::vector<RefcntVal>> RefcntMap;
+// static RefcntMap refcntCandidates;
+// static std::set<std::string> funcNames;
+
+static std::set<std::pair<std::string, unsigned int>> anonymousSet;
+static std::set<std::string> globalWorkingFiles;
+
+llvm::raw_fd_ostream *anonymousLog;
 
 class FieldTypeCallback : public MatchFinder::MatchCallback {
     private:
-    std::set<std::string> files;
+    std::set<std::string> workingFiles;
 
     public:
     virtual void onStartOfTranslationUnit() override {
-        
+
     }
 
     virtual void onEndOfTranslationUnit() override {
-        
+        globalWorkingFiles.insert(workingFiles.begin(), workingFiles.end());
+        workingFiles.clear();
     }
 
     virtual void run(const MatchFinder::MatchResult& Result) override {
@@ -128,6 +133,12 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         const auto &SM = *Result.SourceManager;
         const auto &loc = node->getBeginLoc();
         const auto &filename = SM.getFilename(SM.getSpellingLoc(loc)).str();
+
+        if (globalWorkingFiles.find(filename) != globalWorkingFiles.end()) {
+            return;
+        }
+
+        workingFiles.insert(filename);
         
         const RecordDecl *tmp = dyn_cast<RecordDecl>(node->getLexicalDeclContext());
         const RecordDecl *parent;
@@ -138,14 +149,18 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
             // llvm::outs() << "parent: " << parent->getParent()->getDeclKindName() << "\n";
         } while(tmp = dyn_cast<RecordDecl>(parent->getLexicalDeclContext()));
 
-
         // llvm::outs() << "Struct: " << parent->getName() << "\n";
         // llvm::outs() << "    " << node->getType().getAsString() << " " << node->getName() << "\n";
 
         if (parent->getName() == "") {
-            llvm::outs() << "pos: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
-            parent->print(llvm::outs());
-            llvm::outs() << "\n";
+            auto result = anonymousSet.insert({filename, SM.getExpansionLineNumber(loc)});
+            if (!result.second) {
+                llvm::errs() << "ERROR occured in run() - " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+                exit(1);
+            }
+            *anonymousLog << "pos: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+            parent->print(*anonymousLog);
+            *anonymousLog << "\n";
         }
     }
 };
@@ -245,37 +260,37 @@ bool filepathAccessible(std::string path)
     return file.is_open();
 }
 
-bool satisfyRules(std::vector<RefcntVal> &vec) {
-    bool setExist = false, incExist = false, decExist = false;  // Rule 1
-    bool setValueIsOne = true;                                  // Rule 2
-    bool incContainsOne = false, decContainsOne = false;        // Rule 3
+// bool satisfyRules(std::vector<RefcntVal> &vec) {
+//     bool setExist = false, incExist = false, decExist = false;  // Rule 1
+//     bool setValueIsOne = true;                                  // Rule 2
+//     bool incContainsOne = false, decContainsOne = false;        // Rule 3
 
-    for (auto &elem : vec) {
-        switch (elem.first) {
-        case APIType::SET:
-            setExist = true;
-            if (elem.second > 1) {
-                setValueIsOne = false;
-            }
-            break;
-        case APIType::DIFF:
-            if (elem.second > 0) {
-                incExist = true;
-                if (elem.second == 1) {
-                    incContainsOne = true;
-                }
-            }
-            else if (elem.second < 0) {
-                decExist = true;
-                if (elem.second == -1) {
-                    decContainsOne = true;
-                }
-            }
-            break;
-        }
-    }
-    return setExist && incExist && decExist && setValueIsOne && incContainsOne && decContainsOne;
-}
+//     for (auto &elem : vec) {
+//         switch (elem.first) {
+//         case APIType::SET:
+//             setExist = true;
+//             if (elem.second > 1) {
+//                 setValueIsOne = false;
+//             }
+//             break;
+//         case APIType::DIFF:
+//             if (elem.second > 0) {
+//                 incExist = true;
+//                 if (elem.second == 1) {
+//                     incContainsOne = true;
+//                 }
+//             }
+//             else if (elem.second < 0) {
+//                 decExist = true;
+//                 if (elem.second == -1) {
+//                     decContainsOne = true;
+//                 }
+//             }
+//             break;
+//         }
+//     }
+//     return setExist && incExist && decExist && setValueIsOne && incContainsOne && decContainsOne;
+// }
 
 int main(int argc, const char** argv)
 {
@@ -284,7 +299,9 @@ int main(int argc, const char** argv)
     // check for the optional flags. Note that we also allow for
     // zero or more arguments to allow for more fine-grained error
     // checking
-    if (argc == 2) {
+
+    // filenames explicitly passed
+    if (argc > 1) {
         auto OptionsParser = CommonOptionsParser::create(argc, argv, refcntCategory, cl::ZeroOrMore);
         if (auto err = OptionsParser.takeError()) {
             llvm::errs() << std::move(err);
@@ -311,45 +328,46 @@ int main(int argc, const char** argv)
         ClangTool Tool(OptionsParser->getCompilations(), files);
         Tool.setDiagnosticConsumer(new WarningDiagConsumer);
 
-        recursiveRefcount.open(LOG_DIR "recursive.log");
-        if (!recursiveRefcount.is_open()) {
-            llvm::errs() << "recursiveRefcount open failed\n";
-        }
+        std::error_code error_code;
+        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "anonymous.log"), error_code);
+        // if (!anonymousLog) {
+        //     llvm::errs() << "anonymousLog open failed\n";
+        // }
         Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
 
-        recursiveRefcount.close();
+        delete anonymousLog;
     }
+    // filenames are in compile_commands.json
     else {
         llvm::outs() << "Usage: " << argv[0] << " <filename>\n";
         // llvm::outs() << "start\n";
-        // std::string err_msg;
-        // auto database = clang::tooling::JSONCompilationDatabase::loadFromFile(COMPILE_DATABASE, err_msg, JSONCommandLineSyntax::AutoDetect);
-        // if (database == nullptr) {
-        //     llvm::errs() << "JSON file parse failed\n";
-        //     return 1;
-        // }
+        std::string err_msg;
+        auto database = clang::tooling::JSONCompilationDatabase::loadFromFile(COMPILE_DATABASE, err_msg, JSONCommandLineSyntax::AutoDetect);
+        if (database == nullptr) {
+            llvm::errs() << "JSON file parse failed\n";
+            return 1;
+        }
         
-        // for (std::string& path : database->getAllFiles()) {
-        //     if (!filepathAccessible(path)) {
-        //         llvm::errs() << "Unable to access file '" << path << "'\n";
-        //     }
-        // }
+        for (std::string& path : database->getAllFiles()) {
+            if (!filepathAccessible(path)) {
+                llvm::errs() << "Unable to access file '" << path << "'\n";
+            }
+        }
 
         // // Next, we create the tool which will perform all of the 
         // // code analysis. In the base code you are provided, this
         // // tool doesn't perform any analysis at all.
-        // ClangTool Tool(*database, database->getAllFiles());
-        // Tool.setDiagnosticConsumer(new WarningDiagConsumer);
-        // system("rm -rf " LOG_DIR "*");
+        ClangTool Tool(*database, database->getAllFiles());
+        Tool.setDiagnosticConsumer(new WarningDiagConsumer);
 
-        // recursiveRefcount.open(LOG_DIR "recursive.log");
-        // if (!recursiveRefcount.is_open()) {
-        //     llvm::errs() << "recursiveRefcount open failed\n";
+        std::error_code error_code;
+        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "anonymous.log"), error_code);
+        // if (!anonymousLog) {
+        //     llvm::errs() << "anonymousLog open failed\n";
         // }
+        Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
 
-        // Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
-
-        // recursiveRefcount.close();
+        delete anonymousLog;
     }
     return EXIT_SUCCESS;
 }

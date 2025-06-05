@@ -24,9 +24,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <fstream>
-#include <vector>
-
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -77,7 +74,7 @@ static void refcountIdentify(Module &M) {
 int main(int argc, char *argv[]) {
     // Hide all options apart from the ones specific to this tool
     if (argc != 2) {
-        llvm::errs() << "Usage: " << argv[0] << " <bc file>\n";
+        llvm::errs() << "Usage: " << argv[0] << " <file list>\n";
         return 1;
     }
 
@@ -85,6 +82,9 @@ int main(int argc, char *argv[]) {
     LLVMContext Ctx;
 
     llvm::outs() << "Parsing Start\n";
+
+    
+
     std::unique_ptr<Module> M = parseIRFile(argv[1], Err, Ctx);
     if (!M) {
         llvm::errs() << "Error reading bitcode file: " << argv[1] << "\n";
