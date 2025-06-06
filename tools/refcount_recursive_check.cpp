@@ -107,15 +107,18 @@ enum APIArgType {
 static std::set<std::pair<std::string, unsigned int>> anonymousSet;
 static std::set<std::string> globalWorkingFiles;
 
+size_t fileNum;
+
 llvm::raw_fd_ostream *anonymousLog;
 
 class FieldTypeCallback : public MatchFinder::MatchCallback {
     private:
     std::set<std::string> workingFiles;
+    static size_t fileNo;
 
     public:
     virtual void onStartOfTranslationUnit() override {
-
+        llvm::outs() << "[" << fileNo++ << "/" << fileNum << "]\n";
     }
 
     virtual void onEndOfTranslationUnit() override {
@@ -145,9 +148,11 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         
         do {
             parent = tmp;
+            // if (parent->getName() != "")
+            //     break;
             // llvm::outs() << "cur: " << parent->getName() << "\n";
             // llvm::outs() << "parent: " << parent->getParent()->getDeclKindName() << "\n";
-        } while(tmp = dyn_cast<RecordDecl>(parent->getLexicalDeclContext()));
+        } while((tmp = dyn_cast<RecordDecl>(parent->getLexicalDeclContext())));
 
         // llvm::outs() << "Struct: " << parent->getName() << "\n";
         // llvm::outs() << "    " << node->getType().getAsString() << " " << node->getName() << "\n";
@@ -164,6 +169,8 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         }
     }
 };
+
+size_t FieldTypeCallback::fileNo = 1;
 
 // ----------------------------------------------------------------------------
 // REGISTERING CALLBACKS
@@ -189,16 +196,15 @@ class FieldTypeASTConsumer : public ASTConsumer {
 
         Matcher.addMatcher(
             fieldDecl(
-                anyOf(
-                    hasType(typedefNameDecl(hasAnyName(
-                        "atomic_t",
-                        "atomic_long_t",
-                        "atomic64_t",
-                        "refcount_t"
-                    ))),
-                    hasType(recordDecl(hasName("kref")))
-                ),
-                unless(hasAncestor(recordDecl(hasAnyName(
+                hasType(namedDecl(hasAnyName(
+                    "atomic_t",
+                    "atomic_long_t",
+                    "atomic64_t",
+                    "refcount_t",
+                    "kref",
+                    "refcount_struct"
+                ))),
+                unless(hasParent(recordDecl(hasAnyName(
                     "kref",
                     "refcount_struct"
                 ))))
@@ -224,7 +230,7 @@ class FieldTypeFrontEndAction : public ASTFrontendAction {
 
     public:
     virtual bool BeginSourceFileAction(CompilerInstance &CI) override {
-        const auto &SM = CI.getSourceManager();
+        // const auto &SM = CI.getSourceManager();
         
         // const std::string &filePath = SM.getFileEntryForID(SM.getMainFileID())->tryGetRealPathName().str();
 
@@ -259,38 +265,6 @@ bool filepathAccessible(std::string path)
     std::ifstream file(path);
     return file.is_open();
 }
-
-// bool satisfyRules(std::vector<RefcntVal> &vec) {
-//     bool setExist = false, incExist = false, decExist = false;  // Rule 1
-//     bool setValueIsOne = true;                                  // Rule 2
-//     bool incContainsOne = false, decContainsOne = false;        // Rule 3
-
-//     for (auto &elem : vec) {
-//         switch (elem.first) {
-//         case APIType::SET:
-//             setExist = true;
-//             if (elem.second > 1) {
-//                 setValueIsOne = false;
-//             }
-//             break;
-//         case APIType::DIFF:
-//             if (elem.second > 0) {
-//                 incExist = true;
-//                 if (elem.second == 1) {
-//                     incContainsOne = true;
-//                 }
-//             }
-//             else if (elem.second < 0) {
-//                 decExist = true;
-//                 if (elem.second == -1) {
-//                     decContainsOne = true;
-//                 }
-//             }
-//             break;
-//         }
-//     }
-//     return setExist && incExist && decExist && setValueIsOne && incContainsOne && decContainsOne;
-// }
 
 int main(int argc, const char** argv)
 {
@@ -327,9 +301,10 @@ int main(int argc, const char** argv)
 
         ClangTool Tool(OptionsParser->getCompilations(), files);
         Tool.setDiagnosticConsumer(new WarningDiagConsumer);
-
+        fileNum = argc - 1;
+        
         std::error_code error_code;
-        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "anonymous.log"), error_code);
+        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "CUR_WORKING.log"), error_code);
         // if (!anonymousLog) {
         //     llvm::errs() << "anonymousLog open failed\n";
         // }
@@ -339,7 +314,7 @@ int main(int argc, const char** argv)
     }
     // filenames are in compile_commands.json
     else {
-        llvm::outs() << "Usage: " << argv[0] << " <filename>\n";
+        // llvm::outs() << "Usage: " << argv[0] << " <filename>\n";
         // llvm::outs() << "start\n";
         std::string err_msg;
         auto database = clang::tooling::JSONCompilationDatabase::loadFromFile(COMPILE_DATABASE, err_msg, JSONCommandLineSyntax::AutoDetect);
@@ -359,6 +334,7 @@ int main(int argc, const char** argv)
         // // tool doesn't perform any analysis at all.
         ClangTool Tool(*database, database->getAllFiles());
         Tool.setDiagnosticConsumer(new WarningDiagConsumer);
+        fileNum = database->getAllFiles().size();
 
         std::error_code error_code;
         anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "anonymous.log"), error_code);
