@@ -96,3 +96,39 @@ target_link_libraries(recursive
   clangToolingCore
   clangBasic
 )
+
+#### struct-based ####
+
+set(struct_based_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/refcount_struct_based_check.cpp"
+)
+
+add_executable(struct_based ${struct_based_SOURCES})
+
+target_include_directories(
+  struct_based
+  PRIVATE
+)
+
+target_link_libraries(struct_based
+  LLVMCore
+  LLVMSupport
+  LLVMIRReader
+  LLVMBitWriter
+  LLVMOption
+  LLVMFrontendOpenMP
+  clangTooling
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangAnalysis
+  clangAST
+  clangASTMatchers
+  clangCodeGen
+  clangParse
+  clangSema
+  # clangSupport
+  clangLex
+  clangToolingCore
+  clangBasic
+)
