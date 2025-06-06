@@ -1,0 +1,19 @@
+pos: /home/junwoong/work/refcount/build/work/test.h:20
+struct {
+    refcount_t val1;
+}
+pos: /home/junwoong/work/refcount/build/work/test.c:28
+struct {
+    struct {
+        union {
+            atomic_long_t val1;
+            int val2;
+        };
+    };
+}
+pos: /home/junwoong/work/refcount/build/work/test.c:40
+union {
+    struct wow6 {
+        atomic_t val1;
+    } w;
+}
