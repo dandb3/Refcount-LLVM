@@ -202,6 +202,7 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
                     exit(1);
                 }
                 *anonymousLog << "pos: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+                *anonymousLog << "name: " << name << "\n";
                 parent->print(*anonymousLog);
                 *anonymousLog << "\n";
 
@@ -211,8 +212,8 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
 
         auto result = structNames.insert(name);
         if (!result.second) {
-            // 설마 같은 이름이 있겠어...?
-            llvm::outs() << "ERROR: Same struct name found!\n";
+            // There might be multiple structs with duplicated name...
+            *anonymousLog << "DUPLICATED NAME FOUND!\n";
         }
     }
 };
@@ -351,7 +352,7 @@ int main(int argc, const char** argv)
         fileNum = argc - 1;
         
         std::error_code error_code;
-        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "anonymous.log"), error_code);
+        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "ancestor_anonymous.log"), error_code);
         // if (!anonymousLog) {
         //     llvm::errs() << "anonymousLog open failed\n";
         // }
@@ -384,7 +385,7 @@ int main(int argc, const char** argv)
         fileNum = database->getAllFiles().size();
 
         std::error_code error_code;
-        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "anonymous.log"), error_code);
+        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "ancestor_anonymous.log"), error_code);
         // if (!anonymousLog) {
         //     llvm::errs() << "anonymousLog open failed\n";
         // }

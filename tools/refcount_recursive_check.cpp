@@ -304,7 +304,7 @@ int main(int argc, const char** argv)
         fileNum = argc - 1;
         
         std::error_code error_code;
-        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "CUR_WORKING.log"), error_code);
+        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "root_anonymous.log"), error_code);
         // if (!anonymousLog) {
         //     llvm::errs() << "anonymousLog open failed\n";
         // }
@@ -337,7 +337,7 @@ int main(int argc, const char** argv)
         fileNum = database->getAllFiles().size();
 
         std::error_code error_code;
-        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "anonymous.log"), error_code);
+        anonymousLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "root_anonymous.log"), error_code);
         // if (!anonymousLog) {
         //     llvm::errs() << "anonymousLog open failed\n";
         // }
