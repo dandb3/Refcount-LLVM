@@ -16,6 +16,7 @@
 // License: MIT
 //========================================================================
 #include "RefcountMain.h"
+#include "ClangRefcount.h"
 
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -24,86 +25,68 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
-using namespace llvm;
+#define LOG_DIR "/home/junwoong/work/refcount/build1/log/"
+#define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
-//===----------------------------------------------------------------------===//
-// Command line options
-//===----------------------------------------------------------------------===//
-// static cl::OptionCategory CallCounterCategory{"call counter options"};
+GlobalStatistic GS;
+LocalStatistic LS;
 
-// static cl::opt<std::string> InputModule{cl::Positional,
-//                                         cl::desc{"<Module to analyze>"},
-//                                         cl::value_desc{"bitcode filename"},
-//                                         cl::init(""),
-//                                         cl::Required,
-//                                         cl::cat{CallCounterCategory}};
+void initialize(std::vector<std::string> &totalFiles) {
+    std::error_code errCode;
+    GS.clangAnonymousStructLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "clang_anonymous_struct.log"), errCode);
+    GS.llvmAnonymousStructLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "llvm_anonymous_struct.log"), errCode);
+    GS.llvmMultipleStructWithAnonLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "llvm_mult_struct_with_anon.log"), errCode);
+    GS.dupStructNameLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "dup_struct_name.log"), errCode);
+    GS.fileAccessLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "file_access.log"), errCode);
+    GS.compareLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "compare.log"), errCode);
 
-static void refcountIdentify(Module &M) {
-  // Create a module pass manager and add StaticCallCounterPrinter to it.
-  ModulePassManager MPM;
-  MPM.addPass(Refcount());
+    if (GS.clangAnonymousStructLog == nullptr || GS.llvmAnonymousStructLog == nullptr
+        || GS.llvmMultipleStructWithAnonLog == nullptr || GS.dupStructNameLog == nullptr
+        || GS.fileAccessLog == nullptr) {
+        llvm::errs() << "ERROR: Log init failed\n";
+        exit(1);
+    }
 
-  // Create an analysis manager and register StaticCallCounter with it.
-  ModuleAnalysisManager MAM;
-//   MAM.registerPass([&] { return StaticCallCounter(); });
-
-  // Register all available module analysis passes defined in PassRegistry.def.
-  // We only really need PassInstrumentationAnalysis (which is pulled by
-  // default by PassBuilder), but to keep this concise, let PassBuilder do all
-  // the _heavy-lifting_.
-  PassBuilder PB;
-  PB.registerModuleAnalyses(MAM);
-
-  // Finally, run the passes registered with MPM
-  MPM.run(M, MAM);
+    GS.fileNum = totalFiles.size();
 }
 
-// static void refcountIdentify(std::vector<std::string> &objects) {
-//     SMDiagnostic Err;
-//     LLVMContext Ctx;
-
-//     for (std::string &object : objects) {
-//         std::unique_ptr<Module> M = parseIRFile(object, Err, Ctx);
-//         if (!M) {
-//             llvm::errs() << "Error reading bitcode file: " << object << "\n";
-//             exit(1);
-//         }
-//     }
-// }
+void finish() {
+    delete GS.clangAnonymousStructLog;
+    delete GS.llvmAnonymousStructLog;
+    delete GS.llvmMultipleStructWithAnonLog;
+    delete GS.dupStructNameLog;
+    delete GS.fileAccessLog;
+    delete GS.compareLog;
+}
 
 int main(int argc, char *argv[]) {
     // Hide all options apart from the ones specific to this tool
-    if (argc != 2) {
-        llvm::errs() << "Usage: " << argv[0] << " <file list>\n";
+    if (argc != 1) {
+        llvm::errs() << "Usage: " << argv[0] << "\n";
         return 1;
     }
 
-    SMDiagnostic Err;
-    LLVMContext Ctx;
+    std::string errMsg;
 
-    llvm::outs() << "Parsing Start\n";
-
-    
-
-    std::unique_ptr<Module> M = parseIRFile(argv[1], Err, Ctx);
-    if (!M) {
-        llvm::errs() << "Error reading bitcode file: " << argv[1] << "\n";
+    auto database = clang::tooling::JSONCompilationDatabase::loadFromFile(COMPILE_DATABASE, errMsg, JSONCommandLineSyntax::AutoDetect);
+    if (database == nullptr) {
+        llvm::errs() << "JSON file parse failed\n";
         return 1;
     }
 
-    // Makes sure llvm_shutdown() is called (which cleans up LLVM objects)
-    //  http://llvm.org/docs/ProgrammersManual.html#ending-execution-with-llvm-shutdown
+
     llvm_shutdown_obj SDO;
 
-    llvm::outs() << "Analysis Start\n";
-    refcountIdentify(*M);
+    std::vector<std::string> totalFiles = database->getAllFiles();
+        
+    ClangTool Tool(*database, totalFiles);
+    Tool.setDiagnosticConsumer(new WarningDiagConsumer);
+
+    initialize(totalFiles);
+
+    Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
+
+    finish();
 
     return 0;
 }
-
-// #include "llvm/Linker/Linker.h"
-
-// void foo() {
-//     llvm::Linker linker;
-//     linker.linkInModule();
-// }

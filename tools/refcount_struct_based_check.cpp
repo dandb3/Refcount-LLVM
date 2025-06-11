@@ -17,7 +17,7 @@
 #include <stddef.h>
 
 // #define TEST_DIR "new"
-#define LOG_DIR "/home/junwoong/work/refcount/build/log/"
+#define LOG_DIR "/home/junwoong/work/refcount/build1/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
@@ -214,6 +214,10 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         if (!result.second) {
             // There might be multiple structs with duplicated name...
             *anonymousLog << "DUPLICATED NAME FOUND!\n";
+            *anonymousLog << "pos: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+            *anonymousLog << "name: " << name << "\n";
+            parent->print(*anonymousLog);
+            *anonymousLog << "\n";
         }
     }
 };

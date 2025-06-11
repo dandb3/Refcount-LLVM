@@ -6,7 +6,8 @@
                 "${workspaceFolder}/**",
                 "/home/junwoong/work/Refcount-LLVM/include",
                 "/home/junwoong/programs/llvm-project/clang/include",
-                "/home/junwoong/programs/llvm-project/llvm/include"
+                "/home/junwoong/programs/llvm-project/llvm/include",
+                "${workspaceFolder}/include"
             ],
             "defines": [],
             "cStandard": "c17",

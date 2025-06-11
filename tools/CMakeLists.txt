@@ -24,21 +24,22 @@ else()
   )
 endif()
 
-#### refcount ####
+#### compare_llvm_clang ####
 
-set(refcount_SOURCES
+set(compare_llvm_clang_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../lib/ClangRefcount.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/RefcountMain.cpp"
 )
 
-add_executable(refcount ${refcount_SOURCES})
+add_executable(compare_llvm_clang ${compare_llvm_clang_SOURCES})
 
 target_include_directories(
-  refcount
+  compare_llvm_clang
   PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 
-target_link_libraries(refcount
+target_link_libraries(compare_llvm_clang
   LLVMCore
   LLVMSupport
   LLVMIRReader

@@ -1,6 +1,7 @@
 #ifndef DYNAMIC_H
 #define DYNAMIC_H
 
+#include "Statistics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
@@ -17,19 +18,15 @@ private:
 
     static bool refcountAllExist;
 
-public:
-    PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-
-    // enum Type {
-    //     NONE = -1,
-    //     ATOMIC_T = 0,
-    //     ATOMIC64_T,
-    //     REFCOUNT_T,
-    //     KREF
-    // };
-
-    bool containRefcountType(StructType *ST);
+    std::string filename;
     bool isRefcountType(StructType *ST);
+
+public:
+    PreservedAnalyses run(llvm::Module &M, ModuleAnalysisManager &MAM);
+
+    bool containStructType(StructType *ST, StructType *targetST);
+    bool containRefcountType(StructType *ST);
+    StructType *getNamedAncestor(std::vector<StructType *> &structTypes, StructType *ST);
     static bool isRequired() { return true; }
 };
 

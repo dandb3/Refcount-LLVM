@@ -260,7 +260,7 @@ class FieldTypeFrontEndAction : public ASTFrontendAction {
 
 // Checks if the given filepath can be accessed without issue.
 // Returns true if it is accessible, else returns false.
-bool filepathAccessible(std::string path)
+bool filepathAccessible(std::string &path)
 {   
     std::ifstream file(path);
     return file.is_open();
