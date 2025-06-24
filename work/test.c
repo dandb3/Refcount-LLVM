@@ -39,6 +39,10 @@ union {
     struct wow6 {
         atomic_t val1;
         atomic_t val2;
+        atomic_t val3;
+        atomic_t val4;
+        atomic_long_t val5;
+        struct kref val6;
     } w;
 } st2;
 
@@ -48,5 +52,8 @@ int func() {
     struct wow2 v2;
     struct wow3 v3;
     struct wow6 v6;
+    struct wow6 {
+        int val1;
+    } v7;
     return 0;
 }

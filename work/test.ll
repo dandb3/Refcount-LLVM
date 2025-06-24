@@ -3,23 +3,25 @@ source_filename = "test.c"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-%struct.anon = type { %struct.anon.1 }
-%struct.anon.1 = type { %union.anon.2 }
-%union.anon.2 = type { %struct.atomic64_t }
+%struct.anon = type { %struct.anon.2 }
+%struct.anon.2 = type { %union.anon.3 }
+%union.anon.3 = type { %struct.atomic64_t }
 %struct.atomic64_t = type { i64 }
-%union.anon.3 = type { %struct.wow6 }
-%struct.wow6 = type { %struct.atomic_t, %struct.atomic_t }
+%union.anon.4 = type { %struct.wow6 }
+%struct.wow6 = type { %struct.atomic_t, %struct.atomic_t, %struct.atomic_t, %struct.atomic_t, %struct.atomic64_t, %struct.kref }
 %struct.atomic_t = type { i32 }
+%struct.kref = type { %struct.refcount_struct }
+%struct.refcount_struct = type { %struct.atomic_t }
 %struct.wow = type { %union.anon }
 %union.anon = type { i32 }
 %struct.wow1 = type { %union.anon.0, %union.anon.0 }
 %union.anon.0 = type { %struct.refcount_struct }
-%struct.refcount_struct = type { %struct.atomic_t }
 %struct.wow2 = type { %struct.refcount_struct }
 %struct.wow3 = type { %struct.wow2, %struct.refcount_struct }
+%struct.wow6.1 = type { i32 }
 
 @st1 = dso_local global %struct.anon zeroinitializer, align 8
-@st2 = dso_local global %union.anon.3 zeroinitializer, align 4
+@st2 = dso_local global %union.anon.4 zeroinitializer, align 8
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @func() #0 {
@@ -27,7 +29,8 @@ define dso_local i32 @func() #0 {
   %2 = alloca %struct.wow1, align 4
   %3 = alloca %struct.wow2, align 4
   %4 = alloca %struct.wow3, align 4
-  %5 = alloca %struct.wow6, align 4
+  %5 = alloca %struct.wow6, align 8
+  %6 = alloca %struct.wow6.1, align 4
   ret i32 0
 }
 

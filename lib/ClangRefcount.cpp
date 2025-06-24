@@ -7,6 +7,23 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/SourceMgr.h"
 
+// bool isFilesStruct;
+
+void FieldTypePPCallbacks::InclusionDirective(SourceLocation HashLoc,
+    const Token &IncludeTok,
+    StringRef FileName,
+    bool IsAngled,
+    CharSourceRange FilenameRange,
+    const FileEntry *File,
+    StringRef SearchPath,
+    StringRef RelativePath,
+    const clang::Module *Imported,
+    SrcMgr::CharacteristicKind FileType) {
+    // if (isFilesStruct) {
+    //     *GS.filesStructIncludeLog << "Include: " << FileName << "\n";
+    // }
+}
+
 void FieldTypeCallback::onStartOfTranslationUnit() {}
 
 void FieldTypeCallback::onEndOfTranslationUnit() {}
@@ -24,6 +41,11 @@ void FieldTypeCallback::run(const MatchFinder::MatchResult& Result) {
     
     const RecordDecl *tmp = dyn_cast<RecordDecl>(node->getLexicalDeclContext());
     const RecordDecl *parent;
+
+    // if (isFilesStruct) {
+    //     *GS.filesStructLog << "File: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+    // }
+    // llvm::outs() << "File: " << SM.getFilename(SM.getLocForStartOfFile(SM.getMainFileID())) << "\n";
     
     do {
         parent = tmp;
@@ -36,10 +58,10 @@ void FieldTypeCallback::run(const MatchFinder::MatchResult& Result) {
     // llvm::outs() << "Struct: " << parent->getName() << "\n";
     // llvm::outs() << "    " << node->getType().getAsString() << " " << node->getName() << "\n";
 
-    StringRef name = parent->getName();
+    std::string name = parent->getNameAsString();
 
     if (name == "") {
-        const TranslationUnitDecl *top = dyn_cast<TranslationUnitDecl>(parent->getLexicalDeclContext());
+        const DeclContext *top = parent->getLexicalDeclContext();
         bool typedefFound = false;
 
         for (auto it = top->decls_begin(); it != top->decls_end(); ++it) {
@@ -64,7 +86,7 @@ void FieldTypeCallback::run(const MatchFinder::MatchResult& Result) {
                     break;
                 const RecordDecl *RD = RT->getDecl();
                 if (RD == parent) {
-                    name = TD->getName();
+                    name = TD->getNameAsString();
                     typedefFound = true;
                     // llvm::outs() << "struct: " << name << "\n";
                     break;
@@ -74,11 +96,11 @@ void FieldTypeCallback::run(const MatchFinder::MatchResult& Result) {
         }
 
         if (!typedefFound) {
-            auto result = LS.anonymousSet.insert({filename, SM.getExpansionLineNumber(loc)});
-            if (!result.second) {
-                llvm::errs() << "ERROR occured in run() - " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
-                exit(1);
-            }
+            // auto result = LS.anonymousSet.insert({filename, SM.getExpansionLineNumber(loc)});
+            // if (!result.second) {
+            //     llvm::errs() << "ERROR occured in run() - " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+            //     exit(1);
+            // }
             *GS.clangAnonymousStructLog << "pos: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
             *GS.clangAnonymousStructLog << "name: " << name << "\n";
             parent->print(*GS.clangAnonymousStructLog);
@@ -88,16 +110,18 @@ void FieldTypeCallback::run(const MatchFinder::MatchResult& Result) {
         }
     }
 
-    llvm::outs() << "name: " << name << "\n";
-    auto result = LS.clangStructNames.insert(name);
-    if (!result.second) {
-        // There might be multiple structs with duplicated name...
-        *GS.dupStructNameLog << "DUPLICATED NAME FOUND!\n";
-        *GS.dupStructNameLog << "pos: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
-        *GS.dupStructNameLog << "name: " << name << "\n";
-        parent->print(*GS.dupStructNameLog);
-        *GS.dupStructNameLog << "\n";
-    }
+    // if (isFilesStruct) {
+    //     *GS.filesStructLog << "name: " << name << "\n";
+    // }
+    LS.clangStructNames[name] += 1;
+    // if (!LS.clangStructNames.insert(name).second) {
+        // if (LS.dupStructNames.insert(name).second) {
+        //     // There might be multiple structs with duplicated name...
+        //     *GS.dupStructNameLog << "DUPLICATED NAME FOUND!\n";
+        //     *GS.dupStructNameLog << "pos: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+        //     *GS.dupStructNameLog << "name: " << name << "\n";
+        // }
+    // }
 }
 
 FieldTypeASTConsumer::FieldTypeASTConsumer(clang::Preprocessor& PP) {
@@ -108,6 +132,7 @@ FieldTypeASTConsumer::FieldTypeASTConsumer(clang::Preprocessor& PP) {
     // At the moment, there are no checks registered
 
     // PP.addPPCallbacks(std::make_unique<clang::PPCallbacks>());
+    // PP.addPPCallbacks(std::make_unique<FieldTypePPCallbacks>());
 
     auto *callback = new FieldTypeCallback;
 
@@ -135,11 +160,12 @@ void FieldTypeASTConsumer::HandleTranslationUnit(ASTContext& Context) {
 }
 
 bool FieldTypeFrontEndAction::BeginSourceFileAction(CompilerInstance &CI) {
-    llvm::outs() << "[" << ++GS.fileNo << "/" << GS.fileNum << "]\n";
-
     const auto &SM = CI.getSourceManager();
     
     cPath = SM.getFileEntryForID(SM.getMainFileID())->tryGetRealPathName().str();
+    llvm::outs() << "[" << ++GS.fileNo << "/" << GS.fileNum << "]\n";
+    llvm::outs() << "File: " << cPath << "\n";
+
     if (cPath.size() >= 2 && cPath.compare(cPath.size() - 2, 2, ".c") == 0) {
         bcPath = cPath.substr(0, cPath.size() - 2) + ".bc";
 
@@ -151,10 +177,17 @@ bool FieldTypeFrontEndAction::BeginSourceFileAction(CompilerInstance &CI) {
             *GS.fileAccessLog << "cpath: " << cPath << ", bcpath: " << bcPath << "\n";
             return false;
         }
+
+        // if (cPath == "/home/junwoong/linux/linux-current-v6.6/drivers/hid/bpf/hid_bpf_jmp_table.c"
+        //     || cPath == "/home/junwoong/linux/linux-current-v6.6/drivers/hid/bpf/hid_bpf_dispatch.c") {
+        //     isFilesStruct = true;
+        //     *GS.filesStructLog << "Path: " << cPath << "\n";
+        //     *GS.filesStructIncludeLog<< "Path: " << cPath << "\n";
+        // }
         return true;
     }
     *GS.fileAccessLog << "cpath: " << cPath << "\n";
-    llvm::outs() << "LEARN\n";
+    // llvm::outs() << "LEARN\n";
     return false;
 }
 
@@ -169,6 +202,7 @@ void FieldTypeFrontEndAction::EndSourceFileAction() {
     SMDiagnostic Err;
     LLVMContext Ctx;
 
+    // llvm::outs() << "Clang libtooling finished\n";
     std::unique_ptr<llvm::Module> M = parseIRFile(bcPath, Err, Ctx);
     if (!M) {
         llvm::errs() << "ERROR: reading bitcode file: " << bcPath << "\n";
@@ -189,17 +223,21 @@ void FieldTypeFrontEndAction::EndSourceFileAction() {
     // LS.print();
     // llvm::outs() << "\n";
 
+    // LS.print();
     LS.compare();
+    // LS.print();
     *GS.compareLog << "cpath: " << cPath << ", bcpath: " << bcPath << "\n";
     *GS.compareLog << "<Clang>\n";
-    for (auto &name : LS.clangStructNames) {
-        *GS.compareLog << "    " << name << "\n";
+    for (auto &elem : LS.clangStructNames) {
+        *GS.compareLog << "    " << elem.first << "\n";
     }
     *GS.compareLog << "<LLVM>\n";
-    for (auto &name : LS.llvmStructNames) {
-        *GS.compareLog << "    " << name << "\n";
+    for (auto &elem : LS.llvmStructNames) {
+        *GS.compareLog << "    " << elem.first << "\n";
     }
     *GS.compareLog << "\n";
     
     LS.clear();
+    // isFilesStruct = false;
+    // llvm::outs() << "LLVM pass finished\n";
 }

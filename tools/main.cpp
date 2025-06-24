@@ -25,7 +25,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define LOG_DIR "/home/junwoong/work/refcount/build1/log/"
+#define LOG_DIR "/home/junwoong/work/refcount/build_test/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 GlobalStatistic GS;
@@ -39,10 +39,13 @@ void initialize(std::vector<std::string> &totalFiles) {
     GS.dupStructNameLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "dup_struct_name.log"), errCode);
     GS.fileAccessLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "file_access.log"), errCode);
     GS.compareLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "compare.log"), errCode);
+    // GS.filesStructLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "files_struct.log"), errCode);
+    // GS.filesStructIncludeLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "files_struct_inc.log"), errCode);
 
     if (GS.clangAnonymousStructLog == nullptr || GS.llvmAnonymousStructLog == nullptr
         || GS.llvmMultipleStructWithAnonLog == nullptr || GS.dupStructNameLog == nullptr
-        || GS.fileAccessLog == nullptr) {
+        || GS.fileAccessLog == nullptr || GS.compareLog == nullptr
+        /*|| GS.filesStructLog == nullptr || GS.filesStructIncludeLog == nullptr*/) {
         llvm::errs() << "ERROR: Log init failed\n";
         exit(1);
     }
@@ -57,6 +60,8 @@ void finish() {
     delete GS.dupStructNameLog;
     delete GS.fileAccessLog;
     delete GS.compareLog;
+    // delete GS.filesStructLog;
+    // delete GS.filesStructIncludeLog;
 }
 
 int main(int argc, char *argv[]) {
@@ -66,6 +71,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    llvm_shutdown_obj SDO;
     std::string errMsg;
 
     auto database = clang::tooling::JSONCompilationDatabase::loadFromFile(COMPILE_DATABASE, errMsg, JSONCommandLineSyntax::AutoDetect);
@@ -75,16 +81,17 @@ int main(int argc, char *argv[]) {
     }
 
 
-    llvm_shutdown_obj SDO;
 
     std::vector<std::string> totalFiles = database->getAllFiles();
-        
-    ClangTool Tool(*database, totalFiles);
-    Tool.setDiagnosticConsumer(new WarningDiagConsumer);
-
     initialize(totalFiles);
-
-    Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
+    
+    for (size_t i = 0; i < totalFiles.size(); ++i) {
+        std::vector<std::string> file(1, totalFiles[i]);
+        ClangTool Tool(*database, file);
+        Tool.setDiagnosticConsumer(new WarningDiagConsumer);
+    
+        Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
+    }
 
     finish();
 

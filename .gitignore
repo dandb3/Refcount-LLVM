@@ -32,3 +32,4 @@
 *.app
 
 build*/
+compare_clang_llvm/

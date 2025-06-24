@@ -43,19 +43,22 @@ static bool isAnonymous(StructType *ST) {
 
 StructType *Refcount::getNamedAncestor(std::vector<StructType *> &structTypes, StructType *ST) {
     bool found;
+    StructType *tmp;
     
     // Assume that each anonymous struct is uniquely contained within a single parent struct.
     while (isAnonymous(ST)) {
+        tmp = ST;
         found = false;
         for (StructType *cur : structTypes) {
-            if (containStructType(cur, ST)) {
+            if (containStructType(cur, tmp)) {
                 if (found) {
                     // check if there exists multiple structs containing same anonymous struct
-                    *GS.llvmMultipleStructWithAnonLog << "file: " << filename << ", " << ST->getName() << "\n";
-                    break;
+                    *GS.llvmMultipleStructWithAnonLog << "file: " << filename << ", " << cur->getName() << "\n";
                 }
-                found = true;
-                ST = cur;
+                else {
+                    found = true;
+                    ST = cur;
+                }
             }
         }
         if (!found) {
@@ -98,8 +101,13 @@ PreservedAnalyses Refcount::run(llvm::Module &M, ModuleAnalysisManager &MAM) {
             // llvm::outs() << "\n";
             namedST = getNamedAncestor(structTypes, ST);
             if (namedST != nullptr) {
-                StringRef name = namedST->getName();
-                LS.llvmStructNames.insert(name.substr(name.find_first_of(".") + 1));
+                std::string name = namedST->getName().str();
+                size_t first = name.find_first_of(".");
+                size_t last = name.find_last_of(".");
+                if (first != last) {
+                    *GS.dupStructNameLog << "file: " << filename << "name: " << name << "\n";
+                }
+                LS.llvmStructNames[name.substr(name.find_first_of(".") + 1)] += 1;
             }
         }
     }

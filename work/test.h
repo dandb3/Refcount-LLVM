@@ -15,7 +15,3 @@ typedef struct refcount_struct {
 struct kref {
     refcount_t refcount;
 };
-
-struct {
-    refcount_t val1;
-};

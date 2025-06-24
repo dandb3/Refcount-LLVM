@@ -35,6 +35,19 @@ class WarningDiagConsumer : public DiagnosticConsumer {
     }
 };
 
+class FieldTypePPCallbacks : public clang::PPCallbacks {
+    virtual void InclusionDirective(SourceLocation HashLoc,
+        const Token &IncludeTok,
+        StringRef FileName,
+        bool IsAngled,
+        CharSourceRange FilenameRange,
+        const FileEntry *File,
+        StringRef SearchPath,
+        StringRef RelativePath,
+        const clang::Module *Imported,
+        SrcMgr::CharacteristicKind FileType);
+};
+
 class FieldTypeCallback : public MatchFinder::MatchCallback {
     public:
     virtual void onStartOfTranslationUnit() override;
