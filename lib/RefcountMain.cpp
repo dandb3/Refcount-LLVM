@@ -95,7 +95,8 @@ PreservedAnalyses Refcount::run(llvm::Module &M, ModuleAnalysisManager &MAM) {
             continue;
         }
 
-        if (Refcount::containRefcountType(ST)) {
+        int count = Refcount::refcountNum(ST);
+        if (count > 0) {
             StructType *namedST;
             // ST->print(llvm::outs());
             // llvm::outs() << "\n";
@@ -107,7 +108,7 @@ PreservedAnalyses Refcount::run(llvm::Module &M, ModuleAnalysisManager &MAM) {
                 if (first != last) {
                     *GS.dupStructNameLog << "file: " << filename << "name: " << name << "\n";
                 }
-                LS.llvmStructNames[name.substr(name.find_first_of(".") + 1)] += 1;
+                LS.llvmStructNames[name.substr(name.find_first_of(".") + 1)] += count;
             }
         }
     }
@@ -151,13 +152,14 @@ bool Refcount::containStructType(StructType *ST, StructType *targetST) {
     return false;
 }
 
-bool Refcount::containRefcountType(StructType *ST) {
+int Refcount::refcountNum(StructType *ST) {
     unsigned int numElem;
     StructType *fieldST;
     Type *fieldTy;
+    int res = 0;
 
     if (ST == Refcount::typeKref || ST == Refcount::typeRefcountStruct) {
-        return false;
+        return res;
     }
 
     // REF_LOG(llvm::outs() << ST->getName() << "\n");
@@ -170,9 +172,9 @@ bool Refcount::containRefcountType(StructType *ST) {
             continue;
 
         if (isRefcountType(fieldST))
-            return true;
+            ++res;
         // REF_LOG(llvm::outs() << "    " << fieldST->getName() << "\n");
     }
 
-    return false;
+    return res;
 }

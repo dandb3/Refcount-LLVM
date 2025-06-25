@@ -24,43 +24,43 @@
 #   )
 # endif()
 
-# #### compare_llvm_clang ####
+#### compare_llvm_clang ####
 
-# set(compare_llvm_clang_SOURCES
-#   "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
-#   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/ClangRefcount.cpp"
-#   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/RefcountMain.cpp"
-# )
+set(compare_llvm_clang_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../lib/ClangRefcount.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../lib/RefcountMain.cpp"
+)
 
-# add_executable(compare_llvm_clang ${compare_llvm_clang_SOURCES})
+add_executable(compare_llvm_clang ${compare_llvm_clang_SOURCES})
 
-# target_include_directories(
-#   compare_llvm_clang
-#   PRIVATE
-#   "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+target_include_directories(
+  compare_llvm_clang
+  PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 
-# target_link_libraries(compare_llvm_clang
-#   LLVMCore
-#   LLVMSupport
-#   LLVMIRReader
-#   LLVMBitWriter
-#   LLVMOption
-#   LLVMFrontendOpenMP
-#   clangTooling
-#   clangFrontend
-#   clangDriver
-#   clangSerialization
-#   clangAnalysis
-#   clangAST
-#   clangASTMatchers
-#   clangCodeGen
-#   clangParse
-#   clangSema
-#   # clangSupport
-#   clangLex
-#   clangToolingCore
-#   clangBasic
-# )
+target_link_libraries(compare_llvm_clang
+  LLVMCore
+  LLVMSupport
+  LLVMIRReader
+  LLVMBitWriter
+  LLVMOption
+  LLVMFrontendOpenMP
+  clangTooling
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangAnalysis
+  clangAST
+  clangASTMatchers
+  clangCodeGen
+  clangParse
+  clangSema
+  # clangSupport
+  clangLex
+  clangToolingCore
+  clangBasic
+)
 
 # #### recursive ####
 
@@ -316,38 +316,38 @@
 #   clangBasic
 # )
 
-#### AnalysisCNP ####
+# #### AnalysisCNP ####
 
-set(AnalysisCNP_SOURCES
-  "${CMAKE_CURRENT_SOURCE_DIR}/AnalysisCNP.cpp"
-)
+# set(AnalysisCNP_SOURCES
+#   "${CMAKE_CURRENT_SOURCE_DIR}/AnalysisCNP.cpp"
+# )
 
-add_executable(AnalysisCNP ${AnalysisCNP_SOURCES})
+# add_executable(AnalysisCNP ${AnalysisCNP_SOURCES})
 
-target_include_directories(
-  AnalysisCNP
-  PRIVATE
-)
+# target_include_directories(
+#   AnalysisCNP
+#   PRIVATE
+# )
 
-target_link_libraries(AnalysisCNP
-  LLVMCore
-  LLVMSupport
-  LLVMIRReader
-  LLVMBitWriter
-  LLVMOption
-  LLVMFrontendOpenMP
-  clangTooling
-  clangFrontend
-  clangDriver
-  clangSerialization
-  clangAnalysis
-  clangAST
-  clangASTMatchers
-  clangCodeGen
-  clangParse
-  clangSema
-  # clangSupport
-  clangLex
-  clangToolingCore
-  clangBasic
-)
+# target_link_libraries(AnalysisCNP
+#   LLVMCore
+#   LLVMSupport
+#   LLVMIRReader
+#   LLVMBitWriter
+#   LLVMOption
+#   LLVMFrontendOpenMP
+#   clangTooling
+#   clangFrontend
+#   clangDriver
+#   clangSerialization
+#   clangAnalysis
+#   clangAST
+#   clangASTMatchers
+#   clangCodeGen
+#   clangParse
+#   clangSema
+#   # clangSupport
+#   clangLex
+#   clangToolingCore
+#   clangBasic
+# )

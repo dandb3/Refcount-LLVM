@@ -25,7 +25,7 @@ public:
     PreservedAnalyses run(llvm::Module &M, ModuleAnalysisManager &MAM);
 
     bool containStructType(StructType *ST, StructType *targetST);
-    bool containRefcountType(StructType *ST);
+    int refcountNum(StructType *ST);
     StructType *getNamedAncestor(std::vector<StructType *> &structTypes, StructType *ST);
     static bool isRequired() { return true; }
 };
