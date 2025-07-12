@@ -65,6 +65,7 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "test.h": "c",
-        "*.def": "cpp"
+        "*.def": "cpp",
+        "forward_list": "cpp"
     }
 }
