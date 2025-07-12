@@ -24,43 +24,43 @@
 #   )
 # endif()
 
-#### compare_llvm_clang ####
+# #### compare_llvm_clang ####
 
-set(compare_llvm_clang_SOURCES
-  "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../lib/ClangRefcount.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../lib/RefcountMain.cpp"
-)
+# set(compare_llvm_clang_SOURCES
+#   "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
+#   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/ClangRefcount.cpp"
+#   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/RefcountMain.cpp"
+# )
 
-add_executable(compare_llvm_clang ${compare_llvm_clang_SOURCES})
+# add_executable(compare_llvm_clang ${compare_llvm_clang_SOURCES})
 
-target_include_directories(
-  compare_llvm_clang
-  PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+# target_include_directories(
+#   compare_llvm_clang
+#   PRIVATE
+#   "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 
-target_link_libraries(compare_llvm_clang
-  LLVMCore
-  LLVMSupport
-  LLVMIRReader
-  LLVMBitWriter
-  LLVMOption
-  LLVMFrontendOpenMP
-  clangTooling
-  clangFrontend
-  clangDriver
-  clangSerialization
-  clangAnalysis
-  clangAST
-  clangASTMatchers
-  clangCodeGen
-  clangParse
-  clangSema
-  # clangSupport
-  clangLex
-  clangToolingCore
-  clangBasic
-)
+# target_link_libraries(compare_llvm_clang
+#   LLVMCore
+#   LLVMSupport
+#   LLVMIRReader
+#   LLVMBitWriter
+#   LLVMOption
+#   LLVMFrontendOpenMP
+#   clangTooling
+#   clangFrontend
+#   clangDriver
+#   clangSerialization
+#   clangAnalysis
+#   clangAST
+#   clangASTMatchers
+#   clangCodeGen
+#   clangParse
+#   clangSema
+#   # clangSupport
+#   clangLex
+#   clangToolingCore
+#   clangBasic
+# )
 
 # #### recursive ####
 
@@ -170,41 +170,41 @@ target_link_libraries(compare_llvm_clang
 #   clangBasic
 # )
 
-# #### refcount_count ####
+#### refcount_count ####
 
-# set(refcount_count_SOURCES
-#   "${CMAKE_CURRENT_SOURCE_DIR}/refcount_count.cpp"
-# )
+set(refcount_count_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/refcount_count.cpp"
+)
 
-# add_executable(refcount_count ${refcount_count_SOURCES})
+add_executable(refcount_count ${refcount_count_SOURCES})
 
-# target_include_directories(
-#   refcount_count
-#   PRIVATE
-# )
+target_include_directories(
+  refcount_count
+  PRIVATE
+)
 
-# target_link_libraries(refcount_count
-#   LLVMCore
-#   LLVMSupport
-#   LLVMIRReader
-#   LLVMBitWriter
-#   LLVMOption
-#   LLVMFrontendOpenMP
-#   clangTooling
-#   clangFrontend
-#   clangDriver
-#   clangSerialization
-#   clangAnalysis
-#   clangAST
-#   clangASTMatchers
-#   clangCodeGen
-#   clangParse
-#   clangSema
-#   # clangSupport
-#   clangLex
-#   clangToolingCore
-#   clangBasic
-# )
+target_link_libraries(refcount_count
+  LLVMCore
+  LLVMSupport
+  LLVMIRReader
+  LLVMBitWriter
+  LLVMOption
+  LLVMFrontendOpenMP
+  clangTooling
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangAnalysis
+  clangAST
+  clangASTMatchers
+  clangCodeGen
+  clangParse
+  clangSema
+  # clangSupport
+  clangLex
+  clangToolingCore
+  clangBasic
+)
 
 # #### test ####
 
@@ -330,6 +330,116 @@ target_link_libraries(compare_llvm_clang
 # )
 
 # target_link_libraries(AnalysisCNP
+#   LLVMCore
+#   LLVMSupport
+#   LLVMIRReader
+#   LLVMBitWriter
+#   LLVMOption
+#   LLVMFrontendOpenMP
+#   clangTooling
+#   clangFrontend
+#   clangDriver
+#   clangSerialization
+#   clangAnalysis
+#   clangAST
+#   clangASTMatchers
+#   clangCodeGen
+#   clangParse
+#   clangSema
+#   # clangSupport
+#   clangLex
+#   clangToolingCore
+#   clangBasic
+# )
+
+# #### FindNestedStruct ####
+
+# set(FindNestedStruct_SOURCES
+#   "${CMAKE_CURRENT_SOURCE_DIR}/FindNestedStruct.cpp"
+# )
+
+# add_executable(FindNestedStruct ${FindNestedStruct_SOURCES})
+
+# target_include_directories(
+#   FindNestedStruct
+#   PRIVATE
+# )
+
+# target_link_libraries(FindNestedStruct
+#   LLVMCore
+#   LLVMSupport
+#   LLVMIRReader
+#   LLVMBitWriter
+#   LLVMOption
+#   LLVMFrontendOpenMP
+#   clangTooling
+#   clangFrontend
+#   clangDriver
+#   clangSerialization
+#   clangAnalysis
+#   clangAST
+#   clangASTMatchers
+#   clangCodeGen
+#   clangParse
+#   clangSema
+#   # clangSupport
+#   clangLex
+#   clangToolingCore
+#   clangBasic
+# )
+
+# #### MatcherTest ####
+
+# set(MatcherTest_SOURCES
+#   "${CMAKE_CURRENT_SOURCE_DIR}/MatcherTest.cpp"
+# )
+
+# add_executable(MatcherTest ${MatcherTest_SOURCES})
+
+# target_include_directories(
+#   MatcherTest
+#   PRIVATE
+# )
+
+# target_link_libraries(MatcherTest
+#   LLVMCore
+#   LLVMSupport
+#   LLVMIRReader
+#   LLVMBitWriter
+#   LLVMOption
+#   LLVMFrontendOpenMP
+#   clangTooling
+#   clangFrontend
+#   clangDriver
+#   clangSerialization
+#   clangAnalysis
+#   clangAST
+#   clangASTMatchers
+#   clangCodeGen
+#   clangParse
+#   clangSema
+#   # clangSupport
+#   clangLex
+#   clangToolingCore
+#   clangBasic
+# )
+
+# #### new_compare ####
+
+# set(new_compare_SOURCES
+#   "${CMAKE_CURRENT_SOURCE_DIR}/NewMain.cpp"
+#   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/NewClangRefcount.cpp"
+#   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/NewRefcountMain.cpp"
+# )
+
+# add_executable(new_compare ${new_compare_SOURCES})
+
+# target_include_directories(
+#   new_compare
+#   PRIVATE
+#   "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+
+# target_link_libraries(new_compare
 #   LLVMCore
 #   LLVMSupport
 #   LLVMIRReader

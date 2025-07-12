@@ -17,7 +17,7 @@
 #include <stddef.h>
 
 // #define TEST_DIR "new"
-#define LOG_DIR "/home/junwoong/work/refcount/build2/log-cur/"
+#define LOG_DIR "/home/junwoong/work/refcount/build_matcher_test/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
@@ -75,7 +75,7 @@ size_t fileNum;
 
 llvm::raw_fd_ostream *anonymousLog;
 
-std::map<std::pair<std::string, std::pair<unsigned int, unsigned int>>, RefcountType> result;
+std::map<std::pair<std::string, unsigned int>, RefcountType> result;
 
 static RefcountType getRefcountType(const std::string &type) {
     if (type == "atomic_t") {
@@ -115,51 +115,41 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
     }
 
     virtual void run(const MatchFinder::MatchResult& Result) override {
-        const clang::FieldDecl *node = Result.Nodes.getNodeAs<clang::FieldDecl>("field");
+        const clang::RecordDecl *node = Result.Nodes.getNodeAs<clang::RecordDecl>("field");
 
         if (node == nullptr) {
             return;
         }
 
         const auto &SM = *Result.SourceManager;
-        const auto &fieldLoc = node->getLocation();
-        const auto &fieldLocBegin = node->getBeginLoc();
-        // const auto &filename = SM.getFilename(SM.getSpellingLoc(fieldLoc)).str();
+        const auto &loc = node->getBeginLoc();
+        // const auto &filename = SM.getFilename(SM.getSpellingLoc(loc)).str();
 
-        const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(fieldLocBegin)));
+        const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(loc)));
         const auto &filename = FE->tryGetRealPathName().str();
 
-        const auto *RT = node->getType().getCanonicalType()->getAs<RecordType>();
-        if (RT) {
-            const RecordDecl *RD = RT->getDecl()->getDefinition();
-            if (RD) {
-                result.insert({ { filename, { SM.getExpansionLineNumber(fieldLoc),
-                    SM.getExpansionColumnNumber(fieldLoc) } },
-                    getRefcountType(node->getType().getAsString()) });
+        llvm::outs() << "File: " << filename << ":" << SM.getExpansionLineNumber(loc) << "\n";
+
+        // auto *typedefnamedecl = node->getTypedefNameForAnonDecl();
+        // if (typedefnamedecl != nullptr) {
+        //     llvm::outs() << "struct: " << typedefnamedecl->getNameAsString() << "\n";
+        // }
+        
+        for (auto *FD : node->fields()) {
+            QualType QT = FD->getType();
+            llvm::outs() << "FDtype: " << QT.getAsString() << "\n";
+            const RecordType *RT = FD->getType()->getAs<RecordType>();
+            if (RT != nullptr) {
+                const RecordDecl *RD = RT->getDecl();
+                auto *TND = RD->getTypedefNameForAnonDecl();
+                if (TND == nullptr) {
+                    llvm::outs() << "RDtype: " << RD->getNameAsString() << "\n";
+                }
+                else {
+                    llvm::outs() << "RDtype: " << TND->getNameAsString() << "\n";
+                }
             }
         }
-
-        // result.insert({ { filename, { SM.getExpansionLineNumber(fieldLoc), SM.getExpansionColumnNumber(fieldLoc) } }, getRefcountType(node->getType().getAsString()) });
-
-        // if (globalWorkingFiles.find(filename) != globalWorkingFiles.end()) {
-        //     return;
-        // }
-
-        // workingFiles.insert(filename);
-        
-        // const RecordDecl *tmp = dyn_cast<RecordDecl>(node->getLexicalDeclContext());
-        // const RecordDecl *parent;
-        
-        // do {
-        //     parent = tmp;
-        // } while((tmp = dyn_cast<RecordDecl>(parent->getLexicalDeclContext())));
-
-        // const auto &parentLoc = parent->getBeginLoc();
-
-        // auto &stat = result[{filename, SM.getExpansionLineNumber(parentLoc)}];
-        // std::string type = node->getType().getAsString();
-
-        // ++stat.res[type];
     }
 };
 
@@ -172,19 +162,24 @@ class FieldTypeASTConsumer : public ASTConsumer {
 
         auto *callback = new FieldTypeCallback;
         Matcher.addMatcher(
-            fieldDecl(
-                hasType(namedDecl(hasAnyName(
-                    "atomic_t",
-                    "atomic_long_t",
-                    "atomic64_t",
-                    "refcount_t",
+            recordDecl(
+                hasDescendant(
+                    fieldDecl(
+                        hasType(namedDecl(hasAnyName(
+                            "atomic_t",
+                            "atomic_long_t",
+                            "atomic64_t",
+                            "refcount_t",
+                            "kref",
+                            "refcount_struct",
+                            "snd_use_lock_t"
+                        )))
+                    )
+                ),
+                unless(hasAnyName(
                     "kref",
                     "refcount_struct"
-                ))),
-                unless(hasParent(recordDecl(hasAnyName(
-                    "kref",
-                    "refcount_struct"
-                ))))
+                ))
             ).bind("field"),
             callback
         );
@@ -279,33 +274,48 @@ int main(int argc, const char** argv)
 
         delete anonymousLog;
     }
-
-    int res[6];
-
-    memset(res, 0, sizeof(res));
-
-    for (auto &elem : result) {
-        ++res[elem.second];
-    }
-
-    llvm::outs() << "atomic_t: " << res[REF_ATOMIC_T] << "\n";
-    llvm::outs() << "atomic_long_t: " << res[REF_ATOMIC_LONG_T] << "\n";
-    llvm::outs() << "atomic64_t: " << res[REF_ATOMIC64_T] << "\n";
-    llvm::outs() << "refcount_t: " << res[REF_REFCOUNT_T] << "\n";
-    llvm::outs() << "kref: " << res[REF_KREF] << "\n";
-    llvm::outs() << "ERROR: " << res[REF_ERROR] << "\n";
     
-    std::ofstream ofs;
-    ofs.open(LOG_DIR "result.stat");
-    if (!ofs.is_open()) {
-        llvm::errs() << "open failed!\n";
-        return EXIT_SUCCESS;
-    }
+    // int res[6];
 
-    for (auto &elem : result) {
-        ofs << elem.first.first << ":" << elem.first.second.first << ":" << elem.first.second.second << ":" << 1 << "\n";
-    }
-    ofs.close();
+    // memset(res, 0, sizeof(res));
+
+    // for (auto &elem : result) {
+    //     ++res[elem.second];
+    // }
+
+    // llvm::outs() << "atomic_t: " << res[REF_ATOMIC_T] << "\n";
+    // llvm::outs() << "atomic_long_t: " << res[REF_ATOMIC_LONG_T] << "\n";
+    // llvm::outs() << "atomic64_t: " << res[REF_ATOMIC64_T] << "\n";
+    // llvm::outs() << "refcount_t: " << res[REF_REFCOUNT_T] << "\n";
+    // llvm::outs() << "kref: " << res[REF_KREF] << "\n";
+    // llvm::outs() << "ERROR: " << res[REF_ERROR] << "\n";
+
+    // std::map<std::string, unsigned int> dupTotal;
+    // std::map<std::string, unsigned int> oneTotal;
+    // std::map<std::string, unsigned int> uniTotal;
+
+    // for (auto it = result.begin(); it != result.end(); ++it) {
+    //     auto &val = it->second;
+
+    //     for (auto iter = val.res.begin(); iter != val.res.end(); ++iter) {
+    //         dupTotal[iter->first] += iter->second;
+    //         oneTotal[iter->first] += 1;
+    //     }
+    //     uniTotal[val.res.begin()->first] += 1;
+    // }
+
+    // llvm::outs() << "dupTotal\n";
+    // for (auto it = dupTotal.begin(); it != dupTotal.end(); ++it) {
+    //     llvm::outs() << "    " << it->first << ": " << it->second << "\n";
+    // }
+    // llvm::outs() << "oneTotal\n";
+    // for (auto it = oneTotal.begin(); it != oneTotal.end(); ++it) {
+    //     llvm::outs() << "    " << it->first << ": " << it->second << "\n";
+    // }
+    // llvm::outs() << "uniTotal\n";
+    // for (auto it = uniTotal.begin(); it != uniTotal.end(); ++it) {
+    //     llvm::outs() << "    " << it->first << ": " << it->second << "\n";
+    // }
 
     return EXIT_SUCCESS;
 }
