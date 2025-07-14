@@ -66,6 +66,7 @@ enum RefcountType {
     REF_ATOMIC64_T,
     REF_REFCOUNT_T,
     REF_KREF,
+    REF_REFCOUNT_STRUCT,
     REF_ERROR
 };
 
@@ -78,8 +79,12 @@ class ID {
     ID(const SourceManager &SM, const std::string &filename, const SourceLocation &loc)
     : filename(filename), line(SM.getExpansionLineNumber(loc)), col(SM.getExpansionColumnNumber(loc)) {}
 
-    void print(llvm::raw_fd_ostream &os, const std::string funcName) {
-        os << filename << ":" << line << ":" << col << ":" << funcName;
+    void print(llvm::raw_fd_ostream &os) const {
+        os << filename << ":" << line << ":" << col << "\n";
+    }
+
+    void print(llvm::raw_fd_ostream &os, const std::string funcName) const {
+        os << filename << ":" << line << ":" << col << ":" << funcName << "\n";
     }
 
     bool operator<(const ID &id) const {
@@ -96,7 +101,7 @@ class OPStat {
     OPStat(const ID &pos, const std::string &name, const std::pair<APIType, int> &tuple)
     : pos(pos), name(name), tuple(tuple) {}
 
-    void print(llvm::raw_fd_ostream &os) {
+    void print(llvm::raw_fd_ostream &os, const std::string &indent = "") const {
         std::string APIstr;
 
         switch (tuple.first) {
@@ -116,8 +121,8 @@ class OPStat {
             break;
         }
 
-        os << pos.filename << ":" << pos.line << ":" << pos.col << "\n";
-        os << name << ":<" << APIstr << "," << tuple.second << ">\n";
+        os << indent << pos.filename << ":" << pos.line << ":" << pos.col << "\n";
+        os << indent << name << ":<" << APIstr << "," << tuple.second << ">\n";
     }
 };
 
@@ -127,6 +132,10 @@ typedef std::map<RefcntKey, RefcntVal> RefcntMap;
 
 size_t fileNum;
 
+// logs
+llvm::raw_fd_ostream *resultLog;
+
+// error logs
 llvm::raw_fd_ostream *fieldNoExistLog;
 llvm::raw_fd_ostream *funcAccessedLog;
 
@@ -148,6 +157,9 @@ static RefcountType getRefcountType(const std::string &type) {
     }
     else if (type == "struct kref") {
         return REF_KREF;
+    }
+    else if (type == "refcount_struct") {
+        return REF_REFCOUNT_STRUCT;
     }
     else {
         llvm::errs() << "UNKNOWN STRUCT NAME FOUND!\n";
@@ -175,8 +187,8 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         }
 
         const auto &SM = *Result.SourceManager;
-        const auto &fieldLoc = node->getLocation();
-        const auto &fieldLocBegin = node->getBeginLoc();
+        const auto &fieldLoc = SM.getExpansionLoc(node->getLocation());
+        const auto &fieldLocBegin = SM.getExpansionLoc(node->getBeginLoc());
         // const auto &filename = SM.getFilename(SM.getSpellingLoc(fieldLoc)).str();
 
         const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(fieldLocBegin)));
@@ -187,7 +199,7 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
             const RecordDecl *RD = RT->getDecl()->getDefinition();
             if (RD) {
                 result.insert({ { SM, filename, fieldLoc },
-                    { getRefcountType(node->getType().getAsString()), 0 } });
+                    { getRefcountType(node->getType().getAsString()), std::vector<OPStat>() } });
             }
         }
     }
@@ -232,6 +244,9 @@ class FieldTypeFrontEndAction : public ASTFrontendAction {
 
     public:
     virtual bool BeginSourceFileAction(CompilerInstance &CI) override {
+        const auto &SM = CI.getSourceManager();
+        const clang::FileEntry *FE = SM.getFileEntryForID(SM.getMainFileID());
+        llvm::outs() << "file: " << FE->getName() << "\n";
         return true;
     }
 
@@ -241,9 +256,7 @@ class FieldTypeFrontEndAction : public ASTFrontendAction {
                 new FieldTypeASTConsumer(CI.getPreprocessor()));
     }
 
-    virtual void EndSourceFileAction() override {
-        
-    }
+    virtual void EndSourceFileAction() override {}
 };
 
 class ArgTypeCallback : public MatchFinder::MatchCallback {
@@ -260,8 +273,8 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
 
         if (const auto *memberExpr = dyn_cast<MemberExpr>(refcntArg)) {
             if (const auto *fieldDecl = dyn_cast<FieldDecl>(memberExpr->getMemberDecl())) {
-                const auto &fieldLoc = fieldDecl->getLocation();
-                const auto &fieldLocBegin = fieldDecl->getBeginLoc();
+                const auto &fieldLoc = SM.getExpansionLoc(fieldDecl->getLocation());
+                const auto &fieldLocBegin = SM.getExpansionLoc(fieldDecl->getBeginLoc());
 
                 const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(fieldLocBegin)));
                 const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
@@ -290,7 +303,7 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
                 diff = intLit->getValue().getSExtValue();
             }
             else {
-                llvm::errs() << "Argument is not literal!\n";
+                // llvm::errs() << "Argument is not literal!\n";
                 // node->dump();
                 return {APIType::VAR, 0};
             }
@@ -302,9 +315,9 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
     bool setKeyVal(const clang::SourceManager &SM, const CallExpr *node,
         APIType apiType, APIArgType argType, long long diff, long long sign) {
 
-        const auto &funcLoc = node->getLocation();
-        const auto &funcLocBegin = node->getBeginLoc();
-
+        const auto &funcLoc = SM.getExpansionLoc(node->getExprLoc());
+        const auto &funcLocBegin = SM.getExpansionLoc(node->getBeginLoc());
+        
         const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(funcLocBegin)));
         const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
 
@@ -315,10 +328,10 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         ID funcKey(SM, filename, funcLoc);
 
         bool err = !operations.insert({ funcKey, calleeName }).second;
-
+        
         if (err) {
             // LOG
-            funcKey.print(*funcAccessedLog);
+            // funcKey.print(*funcAccessedLog, calleeName);
             return true;
         }
 
@@ -338,11 +351,11 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         }
 
         OPStat stat(funcKey, calleeName, getTuple(valArg, apiType, diff, sign));
-
+        
         auto mapIt = getIter(SM, refcntArg);
         if (mapIt == result.end()) {
             // LOG
-            stat.print(*fieldNoExistLog);
+            stat.print(*fieldNoExistLog, "");
             return true;
         }
 
@@ -367,6 +380,7 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         }
         
         const auto &SM = *Result.SourceManager;
+        const std::string &calleeName = node->getDirectCallee()->getNameAsString();
         
         bool err;
 
@@ -425,6 +439,8 @@ class ArgTypeFrontEndAction : public ASTFrontendAction {
     public:
     virtual bool BeginSourceFileAction(CompilerInstance &CI) override {
         const auto &SM = CI.getSourceManager();
+        const clang::FileEntry *FE = SM.getFileEntryForID(SM.getMainFileID());
+        llvm::outs() << "file: " << FE->getName() << "\n";
         return true;
     }
 
@@ -444,23 +460,28 @@ bool filepathAccessible(std::string &path)
 }
 
 void initialize(std::error_code &ecode) {
-    fieldNoExistLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "field_no_exist.log"), ecode);
-    funcAccessedLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "func_accessed.log"), ecode);
+    resultLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "result.stat"), ecode);
+    fieldNoExistLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "field_no_exist.err"), ecode);
+    funcAccessedLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "func_accessed.err"), ecode);
 
-    if (fieldNoExistLog == nullptr || funcAccessedLog == nullptr) {
+    if (fieldNoExistLog == nullptr || funcAccessedLog == nullptr
+        || resultLog == nullptr) {
         llvm::errs() << "log file creation failed!\n";
         exit(1);
     }
 }
 
 void finish() {
+    delete resultLog;
     delete fieldNoExistLog;
     delete funcAccessedLog;
 }
 
 int main(int argc, const char** argv)
 {
-    // filenames explicitly passed
+    std::error_code ecode;
+    initialize(ecode);
+
     if (argc > 1) {
         auto OptionsParser = CommonOptionsParser::create(argc, argv, refcntCategory, cl::ZeroOrMore);
         if (auto err = OptionsParser.takeError()) {
@@ -484,6 +505,9 @@ int main(int argc, const char** argv)
         ClangTool Tool(OptionsParser->getCompilations(), files);
         Tool.setDiagnosticConsumer(new WarningDiagConsumer);
         fileNum = argc - 1;
+
+        Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
+        Tool.run(newFrontendActionFactory<ArgTypeFrontEndAction>().get());
     }
     // filenames are in compile_commands.json
     else {
@@ -502,12 +526,43 @@ int main(int argc, const char** argv)
         ClangTool Tool(*database, database->getAllFiles());
         Tool.setDiagnosticConsumer(new WarningDiagConsumer);
         fileNum = database->getAllFiles().size();
-    }
-        
-    initialize();
 
-    Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
-    Tool.run(newFrontendActionFactory<ArgTypeFrontEndAction>().get());
+        Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
+        Tool.run(newFrontendActionFactory<ArgTypeFrontEndAction>().get());
+    }
+
+    for (auto &elem : result) {
+        elem.first.print(*resultLog);
+
+        std::string type;
+        switch (elem.second.first) {
+        case REF_ATOMIC_T:
+            type = "atomic_t";
+            break;
+        case REF_ATOMIC_LONG_T:
+            type = "atomic_long_t";
+            break;
+        case REF_ATOMIC64_T:
+            type = "atomic64_t";
+            break;
+        case REF_REFCOUNT_T:
+            type = "refcount_t";
+            break;
+        case REF_KREF:
+            type = "kref";
+            break;
+        case REF_REFCOUNT_STRUCT:
+            type = "refcount_struct";
+            break;
+        case REF_ERROR:
+            type = "atomic_t";
+            break;
+        }
+        *resultLog << type << "\n";
+        for (auto &vecElem : elem.second.second) {
+            vecElem.print(*resultLog, "    ");
+        }
+    }
 
     finish();
 
