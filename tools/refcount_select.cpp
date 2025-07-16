@@ -7,8 +7,6 @@
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "RefcountLib.h"
-
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +17,7 @@
 #include <stddef.h>
 
 #define TARGET_DIR "/home/junwoong/linux/linux-current/"
-#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id/log/"
+#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_select_test/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
@@ -131,8 +129,8 @@ size_t fileNum;
 llvm::raw_fd_ostream *resultLog;
 
 // error logs
+llvm::raw_fd_ostream *varErr;
 llvm::raw_fd_ostream *fieldNoExistErr;
-llvm::raw_fd_ostream *funcAccessedErr;
 
 std::map<ID, std::string> operations;
 RefcntMap result;
@@ -181,9 +179,6 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
                 diff = intLit->getValue().getSExtValue();
             }
             else {
-                // LOG
-                // llvm::errs() << "Argument is not literal!\n";
-                // node->dump();
                 return {APIType::VAR, 0};
             }
         }
@@ -191,8 +186,9 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         return { apiType, diff };
     }
 
-    bool setKeyVal(const clang::SourceManager &SM, const CallExpr *node,
-        APIType apiType, APIArgType argType, long long diff, long long sign) {
+    bool setKeyVal(const clang::SourceManager &SM, const clang::LangOptions &LO,
+        const CallExpr *node, APIType apiType, APIArgType argType,
+        long long diff, long long sign) {
 
         const auto &funcLoc = SM.getExpansionLoc(node->getExprLoc());
         const auto &funcLocBegin = SM.getExpansionLoc(node->getBeginLoc());
@@ -210,7 +206,7 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         
         if (err) {
             // LOG
-            // funcKey.print(*funcAccessedErr, calleeName);
+            // funcKey.print(*varErr, calleeName);
             return true;
         }
 
@@ -229,12 +225,31 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
             break;
         }
 
-        OPStat stat(funcKey, calleeName, getTuple(valArg, apiType, diff, sign));
+        std::pair<APIType, int> tuple = getTuple(valArg, apiType, diff, sign);
+
+        if (tuple.first == APIType::VAR) {
+            // LOG
+            SourceRange range = valArg->getSourceRange();
+            std::string text = clang::Lexer::getSourceText(
+                clang::CharSourceRange::getTokenRange(range.getBegin(), range.getEnd()),
+                SM, LO).str();
+            
+            funcKey.print(*varErr);
+            *varErr << "\n" << text << "\n\n";
+        }
+
+        OPStat stat(funcKey, calleeName, tuple);
         
         auto mapIt = getIter(SM, refcntArg);
         if (mapIt == result.end()) {
             // LOG
+            SourceRange range = valArg->getSourceRange();
+            std::string text = clang::Lexer::getSourceText(
+                clang::CharSourceRange::getTokenRange(range.getBegin(), range.getEnd()),
+                SM, LO).str();
+
             stat.print(*fieldNoExistErr, "");
+            *fieldNoExistErr << "\n" << text << "\n\n";
             return true;
         }
 
@@ -259,32 +274,33 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         }
         
         const auto &SM = *Result.SourceManager;
+        const auto &LO = Result.Context->getLangOpts();
         const std::string &calleeName = node->getDirectCallee()->getNameAsString();
         
         bool err;
 
         if (calleeName.find("init") != std::string::npos) {
-            err = setKeyVal(SM, node, APIType::SET, APIArgType::REF_ONLY, 1, 1);
+            err = setKeyVal(SM, LO, node, APIType::SET, APIArgType::REF_ONLY, 1, 1);
         }
         else if (calleeName.find("get") != std::string::npos
             || calleeName.find("inc") != std::string::npos) {
-            err = setKeyVal(SM, node, APIType::DIFF, APIArgType::REF_ONLY, 1, 1);
+            err = setKeyVal(SM, LO, node, APIType::DIFF, APIArgType::REF_ONLY, 1, 1);
         }
         else if (calleeName.find("put") != std::string::npos
             || calleeName.find("dec") != std::string::npos) {
-            err = setKeyVal(SM, node, APIType::DIFF, APIArgType::REF_ONLY, 1, -1);
+            err = setKeyVal(SM, LO, node, APIType::DIFF, APIArgType::REF_ONLY, 1, -1);
         }
         else if (calleeName.find("set") != std::string::npos) {
-            err = setKeyVal(SM, node, APIType::SET, APIArgType::REF_VAL, 0, 1);
+            err = setKeyVal(SM, LO, node, APIType::SET, APIArgType::REF_VAL, 0, 1);
         }
         else if (calleeName.find("add_unless") != std::string::npos) {
-            err = setKeyVal(SM, node, APIType::DIFF, APIArgType::REF_VAL, 0, 1);
+            err = setKeyVal(SM, LO, node, APIType::DIFF, APIArgType::REF_VAL, 0, 1);
         }
         else if (calleeName.find("add") != std::string::npos) {
-            err = setKeyVal(SM, node, APIType::DIFF, APIArgType::VAL_REF, 0, 1);
+            err = setKeyVal(SM, LO, node, APIType::DIFF, APIArgType::VAL_REF, 0, 1);
         }
         else if (calleeName.find("sub") != std::string::npos) {
-            err = setKeyVal(SM, node, APIType::DIFF,  APIArgType::VAL_REF, 0, -1);
+            err = setKeyVal(SM, LO, node, APIType::DIFF,  APIArgType::VAL_REF, 0, -1);
         }
     }
 };
@@ -366,7 +382,7 @@ void parseInputFile() {
             sep == ':') {
             ID key(filename, line, col);
 
-            result[ID];
+            result[key];
         } else {
             std::cerr << "parse failed\n";
             exit(1);
@@ -379,9 +395,9 @@ void initialize(std::error_code &ecode) {
 
     resultLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "operations.stat"), ecode);
     fieldNoExistErr = new raw_fd_ostream(llvm::StringRef(LOG_DIR "field_no_exist.err"), ecode);
-    funcAccessedErr = new raw_fd_ostream(llvm::StringRef(LOG_DIR "func_accessed.err"), ecode);
+    varErr = new raw_fd_ostream(llvm::StringRef(LOG_DIR "var.err"), ecode);
 
-    if (fieldNoExistErr == nullptr || funcAccessedErr == nullptr
+    if (fieldNoExistErr == nullptr || varErr == nullptr
         || resultLog == nullptr) {
         llvm::errs() << "log file creation failed!\n";
         exit(1);
@@ -391,7 +407,7 @@ void initialize(std::error_code &ecode) {
 void finish() {
     delete resultLog;
     delete fieldNoExistErr;
-    delete funcAccessedErr;
+    delete varErr;
 }
 
 int main(int argc, const char** argv)
@@ -454,7 +470,7 @@ int main(int argc, const char** argv)
 
     for (auto &elem : result) {
         elem.first.print(*resultLog);
-        for (auto &vecElem : elem.second.second) {
+        for (auto &vecElem : elem.second) {
             vecElem.print(*resultLog, "    ");
         }
     }

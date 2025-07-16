@@ -66,6 +66,7 @@
         "typeinfo": "cpp",
         "test.h": "c",
         "*.def": "cpp",
-        "forward_list": "cpp"
+        "forward_list": "cpp",
+        "future": "cpp"
     }
 }
