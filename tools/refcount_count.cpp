@@ -17,7 +17,7 @@
 #include <stddef.h>
 
 #define TARGET_DIR "/home/junwoong/linux/linux-current/"
-#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id/log/"
+#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id_thread/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
@@ -25,7 +25,7 @@ using namespace clang;
 using namespace clang::ast_matchers;
 using namespace clang::tooling;
 
-#include "llvm/Support/raw_ostream.h"
+#include "../include/MultiThread.h"
 
 #include <set>
 
@@ -66,12 +66,24 @@ class ID {
     ID(const SourceManager &SM, const std::string &filename, const SourceLocation &loc)
     : filename(filename), line(SM.getExpansionLineNumber(loc)), col(SM.getExpansionColumnNumber(loc)) {}
 
-    void print(llvm::raw_fd_ostream &os) const {
-        os << filename << ":" << line << ":" << col << "\n";
+    // void print(mult::ostream &os) const {
+    //     std::stringstream ss;
+    //     ss << filename << ":" << line << ":" << col << "\n";
+    //     os << ss.str();
+    // }
+
+    // void print(mult::ostream &os, const std::string funcName) const {
+    //     std::stringstream ss;
+    //     ss << filename << ":" << line << ":" << col << ":" << funcName << "\n";
+    //     os << ss.str();
+    // }
+
+    void print(std::stringstream &ss) const {
+        ss << filename << ":" << line << ":" << col << "\n";
     }
 
-    void print(llvm::raw_fd_ostream &os, const std::string funcName) const {
-        os << filename << ":" << line << ":" << col << ":" << funcName << "\n";
+    void print(std::stringstream &ss, const std::string funcName) const {
+        ss << filename << ":" << line << ":" << col << ":" << funcName << "\n";
     }
 
     bool operator<(const ID &id) const {
@@ -86,22 +98,24 @@ typedef std::map<RefcntKey, RefcntVal> RefcntMap;
 size_t fileNum;
 
 // logs
-llvm::raw_fd_ostream *resultLog;
-llvm::raw_fd_ostream *sameKeyDiffTypeErr;
-
-// error logs
-llvm::raw_fd_ostream *fieldNoExistLog;
-llvm::raw_fd_ostream *funcAccessedLog;
+mult::ostream resultLog;
+mult::ostream sameKeyDiffTypeErr;
 
 RefcntMap result;
+std::mutex resultMtx;
 
 class FieldTypeCallback : public MatchFinder::MatchCallback {
     public:
     static size_t fileNo;
+    static std::mutex fileNoMtx;
 
     virtual void onStartOfTranslationUnit() override {
         llvm::outs() << "Collecting refcount candidates...\n";
-        llvm::outs() << "[" << ++fileNo << "/" << fileNum << "]\n";
+        llvm::outs() << "[";
+        fileNoMtx.lock();
+        llvm::outs() << ++fileNo;
+        fileNoMtx.unlock();
+        llvm::outs() << "/" << fileNum << "]\n";
     }
 
     virtual void onEndOfTranslationUnit() override {}
@@ -125,16 +139,21 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         ID key(SM, filename, fieldLoc);
         const std::string &typeName = QT->getAsString();
 
+        resultMtx.lock();
         auto res = result.insert({ key, typeName });
+        resultMtx.unlock();
         if (!res.second && res.first->second != typeName) {
             // LOG
-            *sameKeyDiffTypeErr << res.first->second << "\n";
-            key.print(*sameKeyDiffTypeErr);
+            std::stringstream ss;
+            ss << res.first->second << "\n";
+            key.print(ss);
+            sameKeyDiffTypeErr << ss;
         }
     }
 };
 
 size_t FieldTypeCallback::fileNo = 0;
+std::mutex FieldTypeCallback::fileNoMtx;
 
 class FieldTypeASTConsumer : public ASTConsumer {
 
@@ -208,18 +227,26 @@ bool filepathAccessible(std::string &path)
 }
 
 void initialize(std::error_code &ecode) {
-    resultLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "result.stat"), ecode);
-    sameKeyDiffTypeErr = new raw_fd_ostream(llvm::StringRef(LOG_DIR "same_key_diff_type.err"), ecode);
-
-    if (resultLog == nullptr || sameKeyDiffTypeErr == nullptr) {
+    if (!resultLog.open(LOG_DIR "result.stat.thread")) {
+        llvm::errs() << "log file creation failed!\n";
+        exit(1);
+    }
+    
+    if (!sameKeyDiffTypeErr.open(LOG_DIR "same_key_diff_type.err.thread")) {
         llvm::errs() << "log file creation failed!\n";
         exit(1);
     }
 }
 
 void finish() {
-    delete resultLog;
-    delete sameKeyDiffTypeErr;
+
+}
+
+void execute(const clang::tooling::JSONCompilationDatabase *database, const std::string &filename) {
+    std::vector<std::string> file(1, filename);
+    ClangTool Tool(*database, file);
+    Tool.setDiagnosticConsumer(new WarningDiagConsumer);
+    Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
 }
 
 int main(int argc, const char** argv)
@@ -256,7 +283,7 @@ int main(int argc, const char** argv)
     // filenames are in compile_commands.json
     else {
         std::string err_msg;
-        auto database = clang::tooling::JSONCompilationDatabase::loadFromFile(COMPILE_DATABASE, err_msg, JSONCommandLineSyntax::AutoDetect);
+        const auto database = clang::tooling::JSONCompilationDatabase::loadFromFile(COMPILE_DATABASE, err_msg, JSONCommandLineSyntax::AutoDetect);
         if (database == nullptr) {
             llvm::errs() << "JSON file parse failed\n";
             return 1;
@@ -270,20 +297,20 @@ int main(int argc, const char** argv)
                 llvm::errs() << "Unable to access file '" << path << "'\n";
             }
         }
+
+        mult::ThreadPool pool(16);
         
         for (size_t i = 0; i < totalFiles.size(); ++i) {
-            std::vector<std::string> file(1, totalFiles[i]);
-            ClangTool Tool(*database, file);
-            Tool.setDiagnosticConsumer(new WarningDiagConsumer);
-        
-            Tool.run(newFrontendActionFactory<FieldTypeFrontEndAction>().get());
+            pool.enqueue(execute, database.get(), totalFiles[i]);
         }
     }
 
+    std::stringstream ss;
     for (auto &elem : result) {
-        *resultLog << elem.second << "\n";
-        elem.first.print(*resultLog);
+        ss << elem.second << "\n";
+        elem.first.print(ss);
     }
+    resultLog << ss;
 
     finish();
 
