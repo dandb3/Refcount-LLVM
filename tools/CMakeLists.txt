@@ -206,6 +206,42 @@ target_link_libraries(refcount_count
   clangBasic
 )
 
+#### refcount_select ####
+
+set(refcount_select_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/refcount_select.cpp"
+)
+
+add_executable(refcount_select ${refcount_select_SOURCES})
+
+target_include_directories(
+  refcount_select
+  PRIVATE
+)
+
+target_link_libraries(refcount_select
+  LLVMCore
+  LLVMSupport
+  LLVMIRReader
+  LLVMBitWriter
+  LLVMOption
+  LLVMFrontendOpenMP
+  clangTooling
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangAnalysis
+  clangAST
+  clangASTMatchers
+  clangCodeGen
+  clangParse
+  clangSema
+  # clangSupport
+  clangLex
+  clangToolingCore
+  clangBasic
+)
+
 # #### test ####
 
 # set(main_test_SOURCES
