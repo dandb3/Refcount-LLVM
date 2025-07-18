@@ -17,7 +17,7 @@
 #include <stddef.h>
 
 #define TARGET_DIR "/home/junwoong/linux/linux-current/"
-#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id/log/"
+#define LOG_DIR "/home/junwoong/work/refcount/build_test_ref/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
@@ -95,16 +95,6 @@ llvm::raw_fd_ostream *funcAccessedLog;
 
 RefcntMap result;
 
-// refcount_t, atomic_long_t will be deleted
-static bool isRefcountTypeName(const std::string &typeName) {
-    if (typeName == "atomic_t" || typeName == "atomic_long_t"
-        || typeName == "atomic64_t" || typeName == "refcount_struct"
-        || typeName == "refcount_t" || typeName == "kref") {
-            return true;
-    }
-    return false;
-}
-
 class FieldTypeCallback : public MatchFinder::MatchCallback {
     public:
     static size_t fileNo;
@@ -118,47 +108,28 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
 
     virtual void run(const MatchFinder::MatchResult& Result) override {
         const clang::FieldDecl *FD = Result.Nodes.getNodeAs<clang::FieldDecl>("field");
+        const clang::QualType *QT = Result.Nodes.getNodeAs<clang::QualType>("type");
 
-        if (FD == nullptr) {
-            return;
-        }
-
-        std::string typeName;
-        const auto *RT = FD->getType().getCanonicalType()->getAs<RecordType>();
-        if (RT) {
-            const RecordDecl *RD = RT->getDecl()->getDefinition();
-            if (RD) {
-                const TypedefNameDecl *TND = RD->getTypedefNameForAnonDecl();
-                if (TND == nullptr) {
-                    typeName = RD->getNameAsString();
-                }
-                else {
-                    typeName = TND->getNameAsString();
-                }
-            }
-        }
-        
-        if (!isRefcountTypeName(typeName)) {
+        if (FD == nullptr || QT == nullptr) {
             return;
         }
 
         const auto &SM = *Result.SourceManager;
         const auto &fieldLoc = SM.getExpansionLoc(FD->getLocation());
         const auto &fieldLocBegin = SM.getExpansionLoc(FD->getBeginLoc());
+        // const auto &filename = SM.getFilename(SM.getSpellingLoc(fieldLoc)).str();
 
         const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(fieldLocBegin)));
         const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
 
         ID key(SM, filename, fieldLoc);
+        const std::string &typeName = QT->getAsString();
 
         auto res = result.insert({ key, typeName });
         if (!res.second && res.first->second != typeName) {
             // LOG
-            *sameKeyDiffTypeErr << "expected: " << typeName << "\n";
-            *sameKeyDiffTypeErr << "type: " << res.first->second << "\n";
             *sameKeyDiffTypeErr << res.first->second << "\n";
             key.print(*sameKeyDiffTypeErr);
-            sameKeyDiffTypeErr->flush();
         }
     }
 };
@@ -173,6 +144,27 @@ class FieldTypeASTConsumer : public ASTConsumer {
         auto *callback = new FieldTypeCallback;
         Matcher.addMatcher(
             fieldDecl(
+                hasType(
+                    qualType(
+                        hasCanonicalType(
+                            recordType(
+                                hasDeclaration(
+                                    recordDecl(
+                                        isDefinition(),
+                                        hasAnyName(
+                                            "atomic_t",
+                                            "atomic_long_t",
+                                            "atomic64_t",
+                                            // "refcount_t",
+                                            "kref",
+                                            "refcount_struct"
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ).bind("type")
+                ),
                 unless(hasParent(recordDecl(hasAnyName(
                     "kref",
                     "refcount_struct"

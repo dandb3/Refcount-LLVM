@@ -17,7 +17,7 @@
 #include <stddef.h>
 
 #define TARGET_DIR "/home/junwoong/linux/linux-current/"
-#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_select_test/log/"
+#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
@@ -238,22 +238,22 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
             *varErr << "\n" << text << "\n\n";
         }
 
-        // OPStat stat(funcKey, calleeName, tuple);
+        OPStat stat(funcKey, calleeName, tuple);
         
-        // auto mapIt = getIter(SM, refcntArg);
-        // if (mapIt == result.end()) {
-        //     // LOG
-        //     SourceRange range = valArg->getSourceRange();
-        //     std::string text = clang::Lexer::getSourceText(
-        //         clang::CharSourceRange::getTokenRange(range.getBegin(), range.getEnd()),
-        //         SM, LO).str();
+        auto mapIt = getIter(SM, refcntArg);
+        if (mapIt == result.end()) {
+            // LOG
+            SourceRange range = valArg->getSourceRange();
+            std::string text = clang::Lexer::getSourceText(
+                clang::CharSourceRange::getTokenRange(range.getBegin(), range.getEnd()),
+                SM, LO).str();
 
-        //     stat.print(*fieldNoExistErr, "");
-        //     *fieldNoExistErr << "\n" << text << "\n\n";
-        //     return true;
-        // }
+            stat.print(*fieldNoExistErr, "");
+            *fieldNoExistErr << "\n" << text << "\n\n";
+            return true;
+        }
 
-        // mapIt->second.push_back(stat);
+        mapIt->second.push_back(stat);
         return false;
     }
 
@@ -391,7 +391,7 @@ void parseInputFile() {
 }
 
 void initialize(std::error_code &ecode) {
-    // parseInputFile();
+    parseInputFile();
 
     resultLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "operations.stat"), ecode);
     fieldNoExistErr = new raw_fd_ostream(llvm::StringRef(LOG_DIR "field_no_exist.err"), ecode);
@@ -468,12 +468,12 @@ int main(int argc, const char** argv)
         }
     }
 
-    // for (auto &elem : result) {
-    //     elem.first.print(*resultLog);
-    //     for (auto &vecElem : elem.second) {
-    //         vecElem.print(*resultLog, "    ");
-    //     }
-    // }
+    for (auto &elem : result) {
+        elem.first.print(*resultLog);
+        for (auto &vecElem : elem.second) {
+            vecElem.print(*resultLog, "    ");
+        }
+    }
 
     finish();
 
