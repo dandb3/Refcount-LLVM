@@ -178,8 +178,16 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
             if (const auto *intLit = dyn_cast<IntegerLiteral>(valArg)) {
                 diff = intLit->getValue().getSExtValue();
             }
+            else if (const auto *DRE = dyn_cast<DeclRefExpr>(valArg)) {
+                if (const auto *ECD = dyn_cast<EnumConstantDecl>(DRE->getDecl())) {
+                    diff = ECD->getInitVal().getSExtValue();
+                }
+                else {
+                    return { APIType::VAR, 0 };
+                }
+            }
             else {
-                return {APIType::VAR, 0};
+                return { APIType::VAR, 0 };
             }
         }
         diff *= sign;
