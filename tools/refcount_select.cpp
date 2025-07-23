@@ -120,7 +120,7 @@ class OPStat {
 };
 
 typedef ID RefcntKey;
-typedef std::vector<OPStat> RefcntVal;
+typedef std::pair<std::string, std::vector<OPStat>> RefcntVal;
 typedef std::map<RefcntKey, RefcntVal> RefcntMap;
 
 size_t fileNum;
@@ -235,15 +235,21 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
 
         std::pair<APIType, int> tuple = getTuple(valArg, apiType, diff, sign);
 
+        // this implies valArg != nullptr
         if (tuple.first == APIType::VAR) {
             // LOG
-            SourceRange range = valArg->getSourceRange();
-            std::string text = clang::Lexer::getSourceText(
-                clang::CharSourceRange::getTokenRange(range.getBegin(), range.getEnd()),
-                SM, LO).str();
-            
+            auto CharRange = Lexer::getAsCharRange(valArg->getSourceRange(), SM, LO);
+            CharRange.setEnd(CharRange.getEnd().getLocWithOffset(1));
+
+            auto text = Lexer::getSourceText(CharRange, SM, LO);
+
             funcKey.print(*varErr);
             *varErr << "\n" << text << "\n\n";
+
+            // SourceRange range = valArg->getSourceRange();
+            // const std::string &text = clang::Lexer::getSourceText(
+            //     clang::CharSourceRange::getTokenRange(range.getBegin(), range.getEnd()),
+            //     SM, LO).str();
         }
 
         OPStat stat(funcKey, calleeName, tuple);
@@ -251,17 +257,22 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         auto mapIt = getIter(SM, refcntArg);
         if (mapIt == result.end()) {
             // LOG
-            SourceRange range = valArg->getSourceRange();
-            std::string text = clang::Lexer::getSourceText(
-                clang::CharSourceRange::getTokenRange(range.getBegin(), range.getEnd()),
-                SM, LO).str();
+            auto CharRange = Lexer::getAsCharRange(refcntArg->getSourceRange(), SM, LO);
+            CharRange.setEnd(CharRange.getEnd().getLocWithOffset(1));
+
+            auto text = Lexer::getSourceText(CharRange, SM, LO);
 
             stat.print(*fieldNoExistErr, "");
             *fieldNoExistErr << "\n" << text << "\n\n";
             return true;
+
+            // SourceRange range = refcntArg->getSourceRange();
+            // const std::string &text = clang::Lexer::getSourceText(
+            //     clang::CharSourceRange::getTokenRange(range.getBegin(), range.getEnd()),
+            //     SM, LO).str();
         }
 
-        mapIt->second.push_back(stat);
+        mapIt->second.second.push_back(stat);
         return false;
     }
 
@@ -390,7 +401,7 @@ void parseInputFile() {
             sep == ':') {
             ID key(filename, line, col);
 
-            result[key];
+            result[key] = { typeName, std::vector<OPStat>() };
         } else {
             std::cerr << "parse failed\n";
             exit(1);
@@ -478,7 +489,8 @@ int main(int argc, const char** argv)
 
     for (auto &elem : result) {
         elem.first.print(*resultLog);
-        for (auto &vecElem : elem.second) {
+        *resultLog << elem.second.first << "\n";
+        for (auto &vecElem : elem.second.second) {
             vecElem.print(*resultLog, "    ");
         }
     }
