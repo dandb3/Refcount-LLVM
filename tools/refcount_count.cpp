@@ -123,22 +123,24 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
             return;
         }
 
-        std::string typeName;
-        const auto *RT = FD->getType().getCanonicalType()->getAs<RecordType>();
+        std::string typeCheck;
+        const QualType &QT = FD->getType();
+        const std::string &typeResult = QT.getAsString();
+        const auto *RT = QT.getCanonicalType()->getAs<RecordType>();
         if (RT) {
             const RecordDecl *RD = RT->getDecl()->getDefinition();
             if (RD) {
                 const TypedefNameDecl *TND = RD->getTypedefNameForAnonDecl();
                 if (TND == nullptr) {
-                    typeName = RD->getNameAsString();
+                    typeCheck = RD->getNameAsString();
                 }
                 else {
-                    typeName = TND->getNameAsString();
+                    typeCheck = TND->getNameAsString();
                 }
             }
         }
         
-        if (!isRefcountTypeName(typeName)) {
+        if (!isRefcountTypeName(typeCheck)) {
             return;
         }
 
@@ -151,14 +153,13 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
 
         ID key(SM, filename, fieldLoc);
 
-        auto res = result.insert({ key, typeName });
-        if (!res.second && res.first->second != typeName) {
+        auto res = result.insert({ key, typeResult });
+        if (!res.second && res.first->second != typeResult) {
             // LOG
-            *sameKeyDiffTypeErr << "expected: " << typeName << "\n";
+            *sameKeyDiffTypeErr << "expected: " << typeResult << "\n";
             *sameKeyDiffTypeErr << "type: " << res.first->second << "\n";
             *sameKeyDiffTypeErr << res.first->second << "\n";
             key.print(*sameKeyDiffTypeErr);
-            sameKeyDiffTypeErr->flush();
         }
     }
 };
