@@ -124,7 +124,14 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         }
 
         std::string typeCheck;
-        const QualType &QT = FD->getType();
+        QualType QT = FD->getType();
+        unsigned long size = 1;
+        
+        if (const ConstantArrayType *AT = dyn_cast<ConstantArrayType>(QT.getTypePtr())) {
+            QT = AT->getElementType();
+            size = AT->getSize().getZextValue();
+        }
+
         const std::string &typeResult = QT.getAsString();
         const auto *RT = QT.getCanonicalType()->getAs<RecordType>();
         if (RT) {
@@ -151,15 +158,17 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(fieldLocBegin)));
         const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
 
-        ID key(SM, filename, fieldLoc);
+        for (unsigned long i = 0; i < size; ++i) {
+            ID key(filename, SM.getExpansionLineNumber(fieldLoc), SM.getExpansionColumnNumber(fieldLoc + i));
 
-        auto res = result.insert({ key, typeResult });
-        if (!res.second && res.first->second != typeResult) {
-            // LOG
-            *sameKeyDiffTypeErr << "expected: " << typeResult << "\n";
-            *sameKeyDiffTypeErr << "type: " << res.first->second << "\n";
-            *sameKeyDiffTypeErr << res.first->second << "\n";
-            key.print(*sameKeyDiffTypeErr);
+            auto res = result.insert({ key, typeResult });
+            if (!res.second && res.first->second != typeResult) {
+                // LOG
+                *sameKeyDiffTypeErr << "expected: " << typeResult << "\n";
+                *sameKeyDiffTypeErr << "type: " << res.first->second << "\n";
+                *sameKeyDiffTypeErr << res.first->second << "\n";
+                key.print(*sameKeyDiffTypeErr);
+            }
         }
     }
 };
