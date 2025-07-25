@@ -127,10 +127,12 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         QualType QT = FD->getType();
         unsigned long size = 1;
         
-        if (const ConstantArrayType *AT = dyn_cast<ConstantArrayType>(QT.getTypePtr())) {
-            QT = AT->getElementType();
-            size = AT->getSize().getZextValue();
-        }
+        // if (const ConstantArrayType *AT = dyn_cast<ConstantArrayType>(QT.getTypePtr())) {
+        //     QT = AT->getElementType();
+        //     size = AT->getSize().getZExtValue();
+        // }
+
+
 
         const std::string &typeResult = QT.getAsString();
         const auto *RT = QT.getCanonicalType()->getAs<RecordType>();
@@ -159,7 +161,7 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
 
         for (unsigned long i = 0; i < size; ++i) {
-            ID key(filename, SM.getExpansionLineNumber(fieldLoc), SM.getExpansionColumnNumber(fieldLoc + i));
+            ID key(SM, filename, fieldLoc.getLocWithOffset(i));
 
             auto res = result.insert({ key, typeResult });
             if (!res.second && res.first->second != typeResult) {
