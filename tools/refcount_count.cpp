@@ -161,8 +161,7 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
 
         const auto &SM = *Result.SourceManager;
 
-        SourceLocation SLoc = SM.getSpellingLoc(FD->getLocation());
-        SourceLocation ELoc = SM.getExpansionLoc(FD->getLocation());
+        SourceLocation Loc = FD->getLocation();
 
         SourceLocation BLoc = FD->getBeginLoc();
 
@@ -173,8 +172,8 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         const auto &EFilename = EFE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
 
         // for (unsigned long i = 0; i < size; ++i) {
-        ID SKey(SFilename, SM.getSpellingLineNumber(SLoc), SM.getSpellingColumnNumber(SLoc));
-        ID EKey(EFilename, SM.getSpellingLineNumber(ELoc), SM.getSpellingColumnNumber(ELoc));
+        ID SKey(SFilename, SM.getSpellingLineNumber(Loc), SM.getSpellingColumnNumber(Loc));
+        ID EKey(EFilename, SM.getExpansionLineNumber(Loc), SM.getExpansionColumnNumber(Loc));
 
         auto res = result.insert({ { SKey, EKey }, typeResult });
         if (!res.second && res.first->second != typeResult) {
