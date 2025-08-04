@@ -16,8 +16,8 @@
 #include <iomanip>
 #include <stddef.h>
 
-#define TARGET_DIR "/home/junwoong/linux/linux-current/"
-#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id/log/"
+#define TARGET_DIR "/home/junwoong/linux/linux-current-v5.6/"
+#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id_v5.6_macro_expansion/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
@@ -66,6 +66,9 @@ class ID {
     ID(const SourceManager &SM, const std::string &filename, const SourceLocation &loc)
     : filename(filename), line(SM.getExpansionLineNumber(loc)), col(SM.getExpansionColumnNumber(loc)) {}
 
+    ID(const std::string &filename, unsigned int line, unsigned int col)
+    : filename(filename), line(line), col(col) {}
+
     void print(llvm::raw_fd_ostream &os) const {
         os << filename << ":" << line << ":" << col << "\n";
     }
@@ -79,7 +82,7 @@ class ID {
     }
 };
 
-typedef ID RefcntKey;
+typedef std::pair<ID, ID> RefcntKey; // spellingLoc, expansionLoc
 typedef std::string RefcntVal;
 typedef std::map<RefcntKey, RefcntVal> RefcntMap;
 
@@ -88,6 +91,7 @@ size_t fileNum;
 // logs
 llvm::raw_fd_ostream *resultLog;
 llvm::raw_fd_ostream *sameKeyDiffTypeErr;
+llvm::raw_fd_ostream *expandFromMacroLog;
 
 // error logs
 llvm::raw_fd_ostream *fieldNoExistLog;
@@ -125,14 +129,16 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
 
         std::string typeCheck;
         QualType QT = FD->getType();
-        unsigned long size = 1;
+        // unsigned long size = 1;
+
+        // if (const PointerType *PT = QT->getAs<PointerType>()) {
+        //     QT = PT->getPointeeType();
+        // }
         
         // if (const ConstantArrayType *AT = dyn_cast<ConstantArrayType>(QT.getTypePtr())) {
         //     QT = AT->getElementType();
         //     size = AT->getSize().getZExtValue();
         // }
-
-
 
         const std::string &typeResult = QT.getAsString();
         const auto *RT = QT.getCanonicalType()->getAs<RecordType>();
@@ -154,24 +160,59 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         }
 
         const auto &SM = *Result.SourceManager;
-        const auto &fieldLoc = SM.getExpansionLoc(FD->getLocation());
-        const auto &fieldLocBegin = SM.getExpansionLoc(FD->getBeginLoc());
 
-        const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(fieldLocBegin)));
-        const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
+        SourceLocation SLoc = SM.getSpellingLoc(FD->getLocation());
+        SourceLocation ELoc = SM.getExpansionLoc(FD->getLocation());
 
-        for (unsigned long i = 0; i < size; ++i) {
-            ID key(SM, filename, fieldLoc.getLocWithOffset(i));
+        SourceLocation BLoc = FD->getBeginLoc();
 
-            auto res = result.insert({ key, typeResult });
-            if (!res.second && res.first->second != typeResult) {
-                // LOG
-                *sameKeyDiffTypeErr << "expected: " << typeResult << "\n";
-                *sameKeyDiffTypeErr << "type: " << res.first->second << "\n";
-                *sameKeyDiffTypeErr << res.first->second << "\n";
-                key.print(*sameKeyDiffTypeErr);
-            }
+        const FileEntry *SFE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(BLoc)));
+        const FileEntry *EFE = SM.getFileEntryForID(SM.getFileID(SM.getExpansionLoc(BLoc)));
+
+        const auto &SFilename = SFE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
+        const auto &EFilename = EFE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
+
+        // for (unsigned long i = 0; i < size; ++i) {
+        ID SKey(SFilename, SM.getSpellingLineNumber(SLoc), SM.getSpellingColumnNumber(SLoc));
+        ID EKey(EFilename, SM.getSpellingLineNumber(ELoc), SM.getSpellingColumnNumber(ELoc));
+
+        auto res = result.insert({ { SKey, EKey }, typeResult });
+        if (!res.second && res.first->second != typeResult) {
+            // LOG
+            *sameKeyDiffTypeErr << "expected: " << typeResult << "\n";
+            *sameKeyDiffTypeErr << "type: " << res.first->second << "\n";
+            *sameKeyDiffTypeErr << res.first->second << "\n";
+            SKey.print(*sameKeyDiffTypeErr);
+            EKey.print(*sameKeyDiffTypeErr);
         }
+        // }
+
+        // const auto &fieldLoc = SM.getExpansionLoc(FD->getLocation());
+        // const auto &fieldLocBegin = SM.getExpansionLoc(FD->getBeginLoc());
+
+        // const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(fieldLocBegin)));
+        // const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
+
+        // SourceLocation SL = FD->getLocation();
+        // if (SL.isMacroID()) {
+        //     *expandFromMacroLog << filename << ":";
+        //     *expandFromMacroLog << SM.getSpellingLineNumber(SL) << ":";
+        //     *expandFromMacroLog << SM.getSpellingColumnNumber(SL) << "\n";
+        //     expandFromMacroLog->flush();
+        // }
+
+        // for (unsigned long i = 0; i < size; ++i) {
+        //     ID key(SM, filename, fieldLoc.getLocWithOffset(i));
+
+        //     auto res = result.insert({ key, typeResult });
+        //     if (!res.second && res.first->second != typeResult) {
+        //         // LOG
+        //         *sameKeyDiffTypeErr << "expected: " << typeResult << "\n";
+        //         *sameKeyDiffTypeErr << "type: " << res.first->second << "\n";
+        //         *sameKeyDiffTypeErr << res.first->second << "\n";
+        //         key.print(*sameKeyDiffTypeErr);
+        //     }
+        // }
     }
 };
 
@@ -185,10 +226,10 @@ class FieldTypeASTConsumer : public ASTConsumer {
         auto *callback = new FieldTypeCallback;
         Matcher.addMatcher(
             fieldDecl(
-                unless(hasParent(recordDecl(hasAnyName(
-                    "kref",
-                    "refcount_struct"
-                ))))
+                // unless(hasParent(recordDecl(hasAnyName(
+                //     "kref",
+                //     "refcount_struct"
+                // ))))
             ).bind("field"),
             callback
         );
@@ -230,8 +271,9 @@ bool filepathAccessible(std::string &path)
 void initialize(std::error_code &ecode) {
     resultLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "result.stat"), ecode);
     sameKeyDiffTypeErr = new raw_fd_ostream(llvm::StringRef(LOG_DIR "same_key_diff_type.err"), ecode);
+    expandFromMacroLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "expand_from_macro.stat"), ecode);
 
-    if (resultLog == nullptr || sameKeyDiffTypeErr == nullptr) {
+    if (resultLog == nullptr || sameKeyDiffTypeErr == nullptr || expandFromMacroLog == nullptr) {
         llvm::errs() << "log file creation failed!\n";
         exit(1);
     }
@@ -240,6 +282,7 @@ void initialize(std::error_code &ecode) {
 void finish() {
     delete resultLog;
     delete sameKeyDiffTypeErr;
+    delete expandFromMacroLog;
 }
 
 int main(int argc, const char** argv)
@@ -302,7 +345,8 @@ int main(int argc, const char** argv)
 
     for (auto &elem : result) {
         *resultLog << elem.second << "\n";
-        elem.first.print(*resultLog);
+        elem.first.first.print(*resultLog);
+        elem.first.second.print(*resultLog);
     }
 
     finish();

@@ -16,8 +16,8 @@
 #include <iomanip>
 #include <stddef.h>
 
-#define TARGET_DIR "/home/junwoong/linux/linux-current/"
-#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id/log/"
+#define TARGET_DIR "/home/junwoong/linux/linux-current-v5.6/"
+#define LOG_DIR "/home/junwoong/work/refcount/build_refcount_id_v5.6_ptr_ver/log/"
 #define COMPILE_DATABASE LOG_DIR "compile_commands.json"
 
 using namespace llvm;
@@ -139,7 +139,11 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
     private:
     static size_t fileNo;
 
-    RefcntMap::iterator getIter(const clang::SourceManager &SM, const Expr *refcntArg) {
+    const SourceManager *SM;
+    const ASTContext *CTX;
+    const LangOptions *LO;
+
+    RefcntMap::iterator getIter(const Expr *refcntArg) {
         RefcntMap::iterator ret = result.end();
 
         refcntArg = refcntArg->IgnoreParenImpCasts();
@@ -149,13 +153,13 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
 
         if (const auto *memberExpr = dyn_cast<MemberExpr>(refcntArg)) {
             if (const auto *fieldDecl = dyn_cast<FieldDecl>(memberExpr->getMemberDecl())) {
-                const auto &fieldLoc = SM.getExpansionLoc(fieldDecl->getLocation());
-                const auto &fieldLocBegin = SM.getExpansionLoc(fieldDecl->getBeginLoc());
+                const auto &fieldLoc = SM->getExpansionLoc(fieldDecl->getLocation());
+                const auto &fieldLocBegin = SM->getExpansionLoc(fieldDecl->getBeginLoc());
 
-                const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(fieldLocBegin)));
+                const FileEntry *FE = SM->getFileEntryForID(SM->getFileID(SM->getSpellingLoc(fieldLocBegin)));
                 const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
 
-                ID fieldKey(SM, filename, fieldLoc);
+                ID fieldKey(*SM, filename, fieldLoc);
 
                 ret = result.find(fieldKey);
             }
@@ -175,7 +179,47 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
                 valArg = UO->getSubExpr()->IgnoreParenImpCasts();
             }
 
-            if (const auto *intLit = dyn_cast<IntegerLiteral>(valArg)) {
+            clang::Expr::EvalResult evalResult;
+            if (valArg->EvaluateAsInt(evalResult, *CTX, clang::Expr::SE_NoSideEffects)) {
+                diff = evalResult.Val.getInt().getSExtValue();
+            }
+            else if (const auto *binOp = dyn_cast<BinaryOperator>(valArg)) {
+                auto lhsResult = getTuple(binOp->getLHS(), apiType, 0, 1);
+                auto rhsResult = getTuple(binOp->getRHS(), apiType, 0, 1);
+                
+                if (lhsResult.first != APIType::VAR && rhsResult.first != APIType::VAR) {
+                    // 연산자에 따른 처리
+                    switch (binOp->getOpcode()) {
+                        case BO_Shl: // << 연산
+                            diff = lhsResult.second << rhsResult.second;
+                            break;
+                        case BO_Shr: // >> 연산
+                            diff = lhsResult.second >> rhsResult.second;
+                            break;
+                        case BO_Add: // + 연산
+                            diff = lhsResult.second + rhsResult.second;
+                            break;
+                        case BO_Sub: // - 연산
+                            diff = lhsResult.second - rhsResult.second;
+                            break;
+                        case BO_Mul: // * 연산
+                            diff = lhsResult.second * rhsResult.second;
+                            break;
+                        case BO_Div: // / 연산
+                            if (rhsResult.second != 0) {
+                                diff = lhsResult.second / rhsResult.second;
+                            } else {
+                                return { APIType::VAR, 0 };
+                            }
+                            break;
+                        default:
+                            return { APIType::VAR, 0 };
+                    }
+                } else {
+                    return { APIType::VAR, 0 };
+                }
+            }
+            else if (const auto *intLit = dyn_cast<IntegerLiteral>(valArg)) {
                 diff = intLit->getValue().getSExtValue();
             }
             else if (const auto *DRE = dyn_cast<DeclRefExpr>(valArg)) {
@@ -194,21 +238,20 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         return { apiType, diff };
     }
 
-    bool setKeyVal(const clang::SourceManager &SM, const clang::LangOptions &LO,
-        const CallExpr *node, APIType apiType, APIArgType argType,
+    bool setKeyVal(const CallExpr *node, APIType apiType, APIArgType argType,
         long long diff, long long sign) {
 
-        const auto &funcLoc = SM.getExpansionLoc(node->getExprLoc());
-        const auto &funcLocBegin = SM.getExpansionLoc(node->getBeginLoc());
+        const auto &funcLoc = SM->getExpansionLoc(node->getExprLoc());
+        const auto &funcLocBegin = SM->getExpansionLoc(node->getBeginLoc());
         
-        const FileEntry *FE = SM.getFileEntryForID(SM.getFileID(SM.getSpellingLoc(funcLocBegin)));
+        const FileEntry *FE = SM->getFileEntryForID(SM->getFileID(SM->getSpellingLoc(funcLocBegin)));
         const auto &filename = FE->tryGetRealPathName().str().substr(sizeof(TARGET_DIR) - 1);
 
         const std::string &calleeName = node->getDirectCallee()->getNameAsString();
 
         const Expr *refcntArg, *valArg;
 
-        ID funcKey(SM, filename, funcLoc);
+        ID funcKey(*SM, filename, funcLoc);
 
         bool err = !operations.insert({ funcKey, calleeName }).second;
         
@@ -238,10 +281,10 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
         // this implies valArg != nullptr
         if (tuple.first == APIType::VAR) {
             // LOG
-            auto CharRange = Lexer::getAsCharRange(valArg->getSourceRange(), SM, LO);
-            CharRange.setEnd(CharRange.getEnd().getLocWithOffset(1));
+            auto CharRange = Lexer::getAsCharRange(valArg->getSourceRange(), *SM, *LO);
+            CharRange.setEnd(CharRange.getEnd());
 
-            auto text = Lexer::getSourceText(CharRange, SM, LO);
+            auto text = Lexer::getSourceText(CharRange, *SM, *LO);
 
             funcKey.print(*varErr);
             *varErr << "\n" << text << "\n\n";
@@ -254,13 +297,13 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
 
         OPStat stat(funcKey, calleeName, tuple);
         
-        auto mapIt = getIter(SM, refcntArg);
+        auto mapIt = getIter(refcntArg);
         if (mapIt == result.end()) {
             // LOG
-            auto CharRange = Lexer::getAsCharRange(refcntArg->getSourceRange(), SM, LO);
-            CharRange.setEnd(CharRange.getEnd().getLocWithOffset(1));
+            auto CharRange = Lexer::getAsCharRange(refcntArg->getSourceRange(), *SM, *LO);
+            CharRange.setEnd(CharRange.getEnd());
 
-            auto text = Lexer::getSourceText(CharRange, SM, LO);
+            auto text = Lexer::getSourceText(CharRange, *SM, *LO);
 
             stat.print(*fieldNoExistErr, "");
             *fieldNoExistErr << "\n" << text << "\n\n";
@@ -292,34 +335,36 @@ class ArgTypeCallback : public MatchFinder::MatchCallback {
             return;
         }
         
-        const auto &SM = *Result.SourceManager;
-        const auto &LO = Result.Context->getLangOpts();
+        SM = Result.SourceManager;
+        CTX = Result.Context;
+        LO = &CTX->getLangOpts();
+
         const std::string &calleeName = node->getDirectCallee()->getNameAsString();
         
         bool err;
 
         if (calleeName.find("init") != std::string::npos) {
-            err = setKeyVal(SM, LO, node, APIType::SET, APIArgType::REF_ONLY, 1, 1);
+            err = setKeyVal(node, APIType::SET, APIArgType::REF_ONLY, 1, 1);
         }
         else if (calleeName.find("get") != std::string::npos
             || calleeName.find("inc") != std::string::npos) {
-            err = setKeyVal(SM, LO, node, APIType::DIFF, APIArgType::REF_ONLY, 1, 1);
+            err = setKeyVal(node, APIType::DIFF, APIArgType::REF_ONLY, 1, 1);
         }
         else if (calleeName.find("put") != std::string::npos
             || calleeName.find("dec") != std::string::npos) {
-            err = setKeyVal(SM, LO, node, APIType::DIFF, APIArgType::REF_ONLY, 1, -1);
+            err = setKeyVal(node, APIType::DIFF, APIArgType::REF_ONLY, 1, -1);
         }
         else if (calleeName.find("set") != std::string::npos) {
-            err = setKeyVal(SM, LO, node, APIType::SET, APIArgType::REF_VAL, 0, 1);
+            err = setKeyVal(node, APIType::SET, APIArgType::REF_VAL, 0, 1);
         }
         else if (calleeName.find("add_unless") != std::string::npos) {
-            err = setKeyVal(SM, LO, node, APIType::DIFF, APIArgType::REF_VAL, 0, 1);
+            err = setKeyVal(node, APIType::DIFF, APIArgType::REF_VAL, 0, 1);
         }
         else if (calleeName.find("add") != std::string::npos) {
-            err = setKeyVal(SM, LO, node, APIType::DIFF, APIArgType::VAL_REF, 0, 1);
+            err = setKeyVal(node, APIType::DIFF, APIArgType::VAL_REF, 0, 1);
         }
         else if (calleeName.find("sub") != std::string::npos) {
-            err = setKeyVal(SM, LO, node, APIType::DIFF,  APIArgType::VAL_REF, 0, -1);
+            err = setKeyVal(node, APIType::DIFF,  APIArgType::VAL_REF, 0, -1);
         }
     }
 };
