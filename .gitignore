@@ -31,4 +31,7 @@
 *.out
 *.app
 
-build/
+build*/
+work/
+compare_clang_llvm/
+log/*

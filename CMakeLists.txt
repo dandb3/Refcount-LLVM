@@ -45,8 +45,8 @@ project(llvm-tutor)
 # among other paths that will be checked by default when using
 # `find_package(llvm)`. So there's no need to add it here.
 list(APPEND CMAKE_PREFIX_PATH
-  "/home/jdoh/Documents/llvm-project/build/lib/cmake/llvm"
-  "/home/jdoh/Documents/llvm-project/build/lib/cmake/clang"
+  "/home/jdoh/Desktop/work/llvm-project/build/lib/cmake/llvm"
+  "/home/jdoh/Desktop/work/llvm-project/build/lib/cmake/clang"
 )
 
 # The way LLVMConfigVersion.cmake is set up, it will only match MAJOR.MINOR

@@ -4,12 +4,15 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/jdoh/Documents/llvm-project/clang/include",
-                "/home/jdoh/Documents/llvm-project/llvm/include"
+                "/home/jdoh/Desktop/work/llvm-project/clang/include",
+                "/home/jdoh/Desktop/work/llvm-project/llvm/include",
+                "/home/jdoh/Desktop/work/llvm-project/libcxx/include",
+                "/home/jdoh/Desktop/work/llvm-project/libc/include"
             ],
             "defines": [],
+            "compilerPath": "/home/jdoh/Desktop/work/llvm-project/build/bin/clang",
             "cStandard": "c17",
-            "cppStandard": "c++17",
+            "cppStandard": "c++14",
             "intelliSenseMode": "linux-clang-x64"
         }
     ],
