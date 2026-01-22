@@ -1,45 +1,45 @@
-#### static ####
+# #### static ####
 
-set(static_SOURCES
-  "${CMAKE_CURRENT_SOURCE_DIR}/StaticMain.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../lib/StaticCallCounter.cpp"
+# set(static_SOURCES
+#   "${CMAKE_CURRENT_SOURCE_DIR}/StaticMain.cpp"
+#   "${CMAKE_CURRENT_SOURCE_DIR}/../lib/StaticCallCounter.cpp"
+# )
+
+#### FindCNP ####
+
+set(FindCNP_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/FindCNP.cpp"
 )
 
-# #### refcount_count ####
+add_executable(FindCNP ${FindCNP_SOURCES})
 
-# set(refcount_count_SOURCES
-#   "${CMAKE_CURRENT_SOURCE_DIR}/refcount_count.cpp"
-# )
+target_include_directories(
+  FindCNP
+  PRIVATE
+)
 
-# add_executable(refcount_count ${refcount_count_SOURCES})
-
-# target_include_directories(
-#   refcount_count
-#   PRIVATE
-# )
-
-# target_link_libraries(refcount_count
-#   LLVMCore
-#   LLVMSupport
-#   LLVMIRReader
-#   LLVMBitWriter
-#   LLVMOption
-#   LLVMFrontendOpenMP
-#   clangTooling
-#   clangFrontend
-#   clangDriver
-#   clangSerialization
-#   clangAnalysis
-#   clangAST
-#   clangASTMatchers
-#   clangCodeGen
-#   clangParse
-#   clangSema
-#   # clangSupport
-#   clangLex
-#   clangToolingCore
-#   clangBasic
-# )
+target_link_libraries(FindCNP
+  LLVMCore
+  LLVMSupport
+  LLVMIRReader
+  LLVMBitWriter
+  LLVMOption
+  LLVMFrontendOpenMP
+  clangTooling
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangAnalysis
+  clangAST
+  clangASTMatchers
+  clangCodeGen
+  clangParse
+  clangSema
+  # clangSupport
+  clangLex
+  clangToolingCore
+  clangBasic
+)
 
 # #### refcount_select ####
 
@@ -333,20 +333,56 @@ set(static_SOURCES
 #   clangBasic
 # )
 
-#### LLVMpassTest ####
+# #### LLVMpassTest ####
 
-set(LLVMpassTest_SOURCES
-  "${CMAKE_CURRENT_SOURCE_DIR}/LLVMpassTest.cpp"
+# set(LLVMpassTest_SOURCES
+#   "${CMAKE_CURRENT_SOURCE_DIR}/LLVMpassTest.cpp"
+# )
+
+# add_executable(LLVMpassTest ${LLVMpassTest_SOURCES})
+
+# target_include_directories(
+#   LLVMpassTest
+#   PRIVATE
+# )
+
+# target_link_libraries(LLVMpassTest
+#   LLVMCore
+#   LLVMSupport
+#   LLVMIRReader
+#   LLVMBitWriter
+#   LLVMOption
+#   LLVMFrontendOpenMP
+#   clangTooling
+#   clangFrontend
+#   clangDriver
+#   clangSerialization
+#   clangAnalysis
+#   clangAST
+#   clangASTMatchers
+#   clangCodeGen
+#   clangParse
+#   clangSema
+#   # clangSupport
+#   clangLex
+#   clangToolingCore
+#   clangBasic
+# )
+
+#### AnalysisLTO ####
+
+set(AnalysisLTO_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/AnalysisLTO.cpp"
 )
 
-add_executable(LLVMpassTest ${LLVMpassTest_SOURCES})
+add_executable(AnalysisLTO ${AnalysisLTO_SOURCES})
 
 target_include_directories(
-  LLVMpassTest
+  AnalysisLTO
   PRIVATE
 )
 
-target_link_libraries(LLVMpassTest
+target_link_libraries(AnalysisLTO
   LLVMCore
   LLVMSupport
   LLVMIRReader

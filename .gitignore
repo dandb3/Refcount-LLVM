@@ -35,3 +35,4 @@ build*/
 work/
 compare_clang_llvm/
 log/*
+log-v6.17/*

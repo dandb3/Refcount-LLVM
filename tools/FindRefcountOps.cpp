@@ -186,7 +186,7 @@ bool filepathAccessible(std::string &path)
     return file.is_open();
 }
 
-void initialize(std::error_code &ecode) {
+void init(std::error_code &ecode) {
     resultLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "start-refcount-ops-raw.stat"), ecode);
 
     if (resultLog == nullptr) {
@@ -195,14 +195,14 @@ void initialize(std::error_code &ecode) {
     }
 }
 
-void finish() {
+void fini() {
     delete resultLog;
 }
 
 int main(int argc, const char** argv)
 {
     std::error_code ecode;
-    initialize(ecode);
+    init(ecode);
 
     if (argc > 1) {
         auto OptionsParser = CommonOptionsParser::create(argc, argv, refcntCategory, cl::ZeroOrMore);
@@ -257,7 +257,7 @@ int main(int argc, const char** argv)
         }
     }
 
-    finish();
+    fini();
 
     return EXIT_SUCCESS;
 }

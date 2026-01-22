@@ -4,10 +4,10 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/jdoh/Desktop/work/llvm-project/clang/include",
-                "/home/jdoh/Desktop/work/llvm-project/llvm/include",
-                "/home/jdoh/Desktop/work/llvm-project/libcxx/include",
-                "/home/jdoh/Desktop/work/llvm-project/libc/include"
+                "/home/jdoh/Desktop/work/llvm-project-15/clang/include",
+                "/home/jdoh/Desktop/work/llvm-project-15/llvm/include",
+                "/home/jdoh/Desktop/work/llvm-project-15/libcxx/include",
+                "/home/jdoh/Desktop/work/llvm-project-15/libc/include"
             ],
             "defines": [],
             "compilerPath": "/home/jdoh/Desktop/work/llvm-project/build/bin/clang",

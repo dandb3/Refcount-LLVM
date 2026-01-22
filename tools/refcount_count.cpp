@@ -270,7 +270,7 @@ bool filepathAccessible(std::string &path)
     return file.is_open();
 }
 
-void initialize(std::error_code &ecode) {
+void init(std::error_code &ecode) {
     resultLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "result.stat"), ecode);
     sameKeyDiffTypeErr = new raw_fd_ostream(llvm::StringRef(LOG_DIR "same_key_diff_type.err"), ecode);
     expandFromMacroLog = new raw_fd_ostream(llvm::StringRef(LOG_DIR "expand_from_macro.stat"), ecode);
@@ -281,7 +281,7 @@ void initialize(std::error_code &ecode) {
     }
 }
 
-void finish() {
+void fini() {
     delete resultLog;
     delete sameKeyDiffTypeErr;
     delete expandFromMacroLog;
@@ -290,7 +290,7 @@ void finish() {
 int main(int argc, const char** argv)
 {
     std::error_code ecode;
-    initialize(ecode);
+    init(ecode);
 
     if (argc > 1) {
         auto OptionsParser = CommonOptionsParser::create(argc, argv, refcntCategory, cl::ZeroOrMore);
@@ -351,7 +351,7 @@ int main(int argc, const char** argv)
         elem.first.second.print(*resultLog);
     }
 
-    finish();
+    fini();
 
     return EXIT_SUCCESS;
 }
