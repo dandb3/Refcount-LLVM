@@ -5,6 +5,7 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
+#include "clang/AST/RecordLayout.h"
 #include "llvm/Support/CommandLine.h"
 
 #include <unistd.h>
@@ -51,7 +52,7 @@ class WarningDiagConsumer : public DiagnosticConsumer {
 size_t fileNum;
 
 std::set<std::string> RefcountIDs; // (ClangID)
-std::map<std::string, std::set<std::string>> CNPMap; // (ClangID, set of StructName)
+std::map<std::string, std::map<std::string, int64_t>> CNPMap; // (ClangID, (StructName, offset))
 
 std::string getStructName(const RecordDecl *RD) {
     std::string result = RD->getNameAsString();
@@ -68,6 +69,42 @@ std::string getStructName(const RecordDecl *RD) {
 }
 
 class FieldTypeCallback : public MatchFinder::MatchCallback {
+    private:
+        const FieldDecl *findFieldFromRecord(const RecordDecl *Parent, const RecordDecl *Child) {
+            const FieldDecl *ChildFD = nullptr;
+
+            for (const FieldDecl *FD : Parent->fields()) {
+                const Type *Ty = FD->getType().getTypePtr();
+
+                const Type *tmp = Ty;
+                while (tmp->isPointerType() || tmp->isArrayType()) {
+                    tmp = tmp->getPointeeOrArrayElementType();
+                }
+
+                if (const RecordType *RT = tmp->getAs<RecordType>()) {
+                    if (RT->getDecl() == Child) {
+                        if (Ty != tmp) {
+                            llvm::errs() << "ArrayType or PointerType detected!!\n";
+                            Parent->dump(llvm::errs());
+                            exit(1);
+                        }
+                        else {
+                            if (ChildFD) {
+                                llvm::errs() << "Duplicated entries for ChildFD?!\n";
+                                Parent->dump(llvm::errs());
+                                exit(1);
+                            }
+                            else {
+                                ChildFD = FD;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return ChildFD;
+        }
+
     public:
     static size_t fileNo;
 
@@ -98,17 +135,28 @@ class FieldTypeCallback : public MatchFinder::MatchCallback {
         if (RefcountIDs.find(CID) == RefcountIDs.end())
             return;
         
-        const RecordDecl *tmp = dyn_cast<RecordDecl>(FD->getLexicalDeclContext());
-        const RecordDecl *parent;
+        const FieldDecl *ChildField = FD;
+        const RecordDecl *CurParent = dyn_cast<RecordDecl>(ChildField->getLexicalDeclContext());
+        const RecordDecl *CurChild;
+        
         std::string CNPName;
+        int64_t TotalOffsetInBits = 0;
 
         do {
-            parent = tmp;
-            CNPName = getStructName(parent);
+            auto &Ctx = CurParent->getASTContext();
+            const ASTRecordLayout &Layout = Ctx.getASTRecordLayout(CurParent);
+
+            unsigned int FieldIndex = ChildField->getFieldIndex();
+            TotalOffsetInBits += Layout.getFieldOffset(FieldIndex);
+            
+            CNPName = getStructName(CurParent);
             if (CNPName != "") {
-                CNPMap[CID].insert(CNPName);
+                CNPMap[CID][CNPName] = TotalOffsetInBits / Ctx.getCharWidth();
             }
-        } while (tmp = dyn_cast<RecordDecl>(parent->getLexicalDeclContext()));
+
+            CurChild = CurParent;
+            CurParent = dyn_cast<RecordDecl>(CurParent->getLexicalDeclContext());
+        } while (CurParent && (ChildField = findFieldFromRecord(CurParent, CurChild)));
     }
 };
 
@@ -198,7 +246,7 @@ void fini() {
     for (auto &elem : CNPMap) {
         ofs << elem.first << "----";
         for (auto &el : elem.second) {
-            ofs << el << ",";
+            ofs << el.first << "," << el.second << ";";
         }
         ofs << "\n";
     }
