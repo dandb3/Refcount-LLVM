@@ -7,11 +7,33 @@
 
 #### FindCNP ####
 
+# Configuration for FindCNP: the source tree it analyses (its compile_commands.json
+# drives the clang tooling) and the directory holding refcount-field.log (input) /
+# refcount-CNP.log (output). Supply both at configure time, e.g.
+#
+#   cmake -DREFID_TARGET_BASE_DIR=/path/to/linux -DREFID_CNP_DATA_DIR=/path/to/data ...
+#
+# Left unset, FindCNP.cpp falls back to its compiled-in defaults.
+set(REFID_TARGET_BASE_DIR "" CACHE PATH
+    "Root of the source tree FindCNP analyses (must contain compile_commands.json)")
+set(REFID_CNP_DATA_DIR "" CACHE PATH
+    "Directory holding refcount-field.log (input) and refcount-CNP.log (output)")
+
 set(FindCNP_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/FindCNP.cpp"
 )
 
 add_executable(FindCNP ${FindCNP_SOURCES})
+
+# FindCNP.cpp is the only place these paths are baked in.
+if(REFID_TARGET_BASE_DIR)
+  target_compile_definitions(FindCNP PRIVATE
+    REFID_TARGET_BASE_DIR="${REFID_TARGET_BASE_DIR}")
+endif()
+if(REFID_CNP_DATA_DIR)
+  target_compile_definitions(FindCNP PRIVATE
+    REFID_CNP_DATA_DIR="${REFID_CNP_DATA_DIR}")
+endif()
 
 target_include_directories(
   FindCNP

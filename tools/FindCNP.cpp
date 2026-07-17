@@ -17,10 +17,24 @@
 #include <iomanip>
 #include <stddef.h>
 
-#define TARGET_BASE_DIR "/home/jdoh/Desktop/work/linux-v6.17/"
-#define LOG_PATH "/home/jdoh/Desktop/work/custom_llvm_pass/data/refcount-CNP.log"
+// Both paths must be supplied by the build system; there is no default:
+//   cmake -DREFID_TARGET_BASE_DIR=/path/to/linux -DREFID_CNP_DATA_DIR=/path/to/data ...
+//
+// REFID_TARGET_BASE_DIR is the source tree under analysis; its compile_commands.json
+// drives the clang tooling below. REFID_CNP_DATA_DIR holds refcount-field.log (input)
+// and receives refcount-CNP.log (output).
+#ifndef REFID_TARGET_BASE_DIR
+#error "REFID_TARGET_BASE_DIR is not set (cmake -DREFID_TARGET_BASE_DIR=/path/to/linux)"
+#endif
+
+#ifndef REFID_CNP_DATA_DIR
+#error "REFID_CNP_DATA_DIR is not set (cmake -DREFID_CNP_DATA_DIR=/path/to/data)"
+#endif
+
+#define TARGET_BASE_DIR REFID_TARGET_BASE_DIR "/"
 #define COMPILE_DATABASE TARGET_BASE_DIR "compile_commands.json"
-#define REFCOUNT_FIELDS "/home/jdoh/Desktop/work/custom_llvm_pass/data/refcount-field.log"
+#define LOG_PATH REFID_CNP_DATA_DIR "/refcount-CNP.log"
+#define REFCOUNT_FIELDS REFID_CNP_DATA_DIR "/refcount-field.log"
 
 using namespace llvm;
 using namespace clang;
