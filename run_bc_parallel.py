@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""build.sh (KernelBitcode.go 산출물) 의 clang 컴파일 줄만 병렬 실행한다.
+"""Run only the clang compile lines of build.sh (a KernelBitcode.go output) in parallel.
 
-llvm-link 줄은 .bc 를 합칠 뿐 refcount 분석과 무관하므로 제외한다.
-제외하면 줄 사이 의존성이 사라져 전부 동시에 돌릴 수 있다.
-refcount 로그는 clang 이 컴파일 중에 REFID_LOG_DIR 로 직접 떨군다.
+The llvm-link lines merely merge .bc files and are irrelevant to refcount
+analysis, so they are skipped. Dropping them removes the inter-line
+dependencies, so everything can run concurrently. The refcount logs are
+written directly to REFID_LOG_DIR by clang during compilation.
 
-사용법:  ./run_bc_parallel.py [-j 32] [--dry-run]
+Usage:  ./run_bc_parallel.py [-j 32] [--dry-run]
 """
 
 import argparse
@@ -16,18 +17,18 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-# build.sh 의 명령은 "... -o <경로>.bc <경로>.c" 로 끝난다.
+# Commands in build.sh end with "... -o <path>.bc <path>.c".
 SRC_RE = re.compile(r"(\S+\.c)\s*$")
 
 lock = threading.Lock()
 done = 0
 total = 0
-failed = []           # (소스, 출력) — 컴파일 실패
-aborted = []          # (소스, 출력) — refcount 패스가 exit(1)
-running = {}          # 실행 중인 Popen. Ctrl+C 때 죽이려고 들고 있는다.
+failed = []           # (source, output) — compilation failed
+aborted = []          # (source, output) — refcount pass called exit(1)
+running = {}          # running Popen objects, kept so we can kill them on Ctrl+C
 stopping = False
 
-# refcount 패스가 exit(1) 로 중단될 때 남기는 메시지. 걸리면 그 파일은 로그가 없다.
+# Messages the refcount pass leaves when it aborts with exit(1). If hit, that file has no log.
 ABORT_SIGNS = (
     "anonymous struct has too many parents",
     "anonymous struct has no parents",
@@ -69,7 +70,7 @@ def run_one(item):
             failed.append((src, out))
         if any(s in out for s in ABORT_SIGNS):
             aborted.append((src, out))
-        # 진행률은 한 줄에 덮어쓴다. 실패는 그 위에 남긴다.
+        # Overwrite the progress on a single line. Failures are left above it.
         if rc != 0:
             print(f"\r{'':<100}\rFAIL {src}", flush=True)
         pct = done * 100 // total
@@ -80,15 +81,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-j", "--jobs", type=int, default=32)
     ap.add_argument("--build-sh", default=None)
-    ap.add_argument("--dry-run", action="store_true", help="추출만 하고 실행하지 않는다")
+    ap.add_argument("--dry-run", action="store_true", help="extract only, do not run")
     args = ap.parse_args()
 
     kdir = os.path.dirname(os.path.abspath(__file__))
     build_sh = args.build_sh or os.path.join(kdir, "build.sh")
     if not os.path.isfile(build_sh):
-        sys.exit(f"ERROR: build.sh 가 없습니다: {build_sh}")
+        sys.exit(f"ERROR: build.sh not found: {build_sh}")
 
-    # build.sh 안의 명령이 -I./arch/... 처럼 상대경로를 쓰므로 커널 트리에서 실행해야 한다.
+    # Commands in build.sh use relative paths like -I./arch/..., so run from the kernel tree.
     os.chdir(kdir)
 
     with open(build_sh, encoding="utf-8", errors="replace") as f:
@@ -97,13 +98,13 @@ def main():
     global total
     total = len(cmds)
     if total == 0:
-        sys.exit("ERROR: build.sh 에 -emit-llvm 줄이 없습니다")
+        sys.exit("ERROR: no -emit-llvm lines in build.sh")
 
-    print(f"대상 {total} 개, 병렬 {args.jobs}, cwd {kdir}")
+    print(f"targets {total}, jobs {args.jobs}, cwd {kdir}")
     if args.dry_run:
         for c in cmds[:3]:
             print(f"  {source_of(c)}")
-        print(f"  ... (총 {total})")
+        print(f"  ... ({total} total)")
         return
 
     ex = ThreadPoolExecutor(max_workers=args.jobs)
@@ -115,24 +116,24 @@ def main():
     except KeyboardInterrupt:
         global stopping
         stopping = True
-        print("\n중단 중... 실행 중인 clang 을 종료합니다")
+        print("\nStopping... terminating running clang processes")
         with lock:
             for p in running.values():
                 p.kill()
         ex.shutdown(wait=False, cancel_futures=True)
-        print(f"[{done}/{total}] 에서 중단됨")
+        print(f"Interrupted at [{done}/{total}]")
         sys.exit(130)
 
-    print(f"\r{'':<100}\r완료 [{done}/{total}]")
-    print(f"  컴파일 실패     : {len(failed)}")
-    print(f"  패스 abort      : {len(aborted)}")
+    print(f"\r{'':<100}\rdone [{done}/{total}]")
+    print(f"  compile failed  : {len(failed)}")
+    print(f"  pass abort      : {len(aborted)}")
 
     for src, out in aborted[:5]:
         sign = next((s for s in ABORT_SIGNS if s in out), "?")
         print(f"    [abort] {src}: {sign}")
 
     if failed:
-        print("\n실패 상위:")
+        print("\nTop failures:")
         for src, out in failed[:5]:
             first = next((l for l in out.splitlines() if "error:" in l), out.splitlines()[0] if out else "")
             print(f"  {src}\n    {first[:110]}")
