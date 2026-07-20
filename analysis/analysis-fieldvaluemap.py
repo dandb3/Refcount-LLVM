@@ -34,20 +34,18 @@ def create_unified_dictionary(file_pattern):
                 for record in records:
                     lines = record.strip().split('\n')
 
-                    # A record needs at least 4 lines (ID, parent struct, type, op) to be valid.
-                    # The parent struct line was added with the Closest-Named-Parent work (2026-01-19).
-                    if len(lines) < 4:
+                    # A record needs at least 3 lines (ID, type, op) to be valid.
+                    if len(lines) < 3:
                         print("ERROR: No Tuple Found!", file=sys.stderr)
                         continue
 
                     # Extract ID and type.
                     record_id = lines[0].strip()
-                    record_parent = lines[1].strip()
-                    record_type = lines[2].strip()
+                    record_type = lines[1].strip()
 
                     # Parse the operations into a set.
                     current_operations = set()
-                    for op_line in lines[3:]:
+                    for op_line in lines[2:]:
                         try:
                             op, val = op_line.strip().split(',', 1)
                             current_operations.add((op, val))
